@@ -1,0 +1,31 @@
+{
+  "_note": "Lightweight gazetteer for human-readable place names on events in the Donbas AOI. City coords for the UNOSAT-assessed cities are point-cloud centroids from data/ground_truth/unosat_labels.geojson; the rest are well-known settlement coordinates (approximate, enough for nearest-settlement labelling at 1km resolution). Not authoritative admin geometry — that comes from geoBoundaries via geo/load_substrate later.",
+  "places": [
+    { "name": "Mariupol",          "lon": 37.5997, "lat": 47.1045 },
+    { "name": "Volnovakha",        "lon": 37.4951, "lat": 47.6015 },
+    { "name": "Avdiivka",          "lon": 37.7486, "lat": 48.1384 },
+    { "name": "Kramatorsk",        "lon": 37.5547, "lat": 48.7324 },
+    { "name": "Sievierodonetsk",   "lon": 38.4849, "lat": 48.9508 },
+    { "name": "Lysychansk",        "lon": 38.4311, "lat": 48.9062 },
+    { "name": "Rubizhne",          "lon": 38.3827, "lat": 49.0093 },
+    { "name": "Shchastia",         "lon": 39.2313, "lat": 48.7387 },
+    { "name": "Donetsk",           "lon": 37.8028, "lat": 48.0159 },
+    { "name": "Bakhmut",           "lon": 37.9989, "lat": 48.5949 },
+    { "name": "Sloviansk",         "lon": 37.6189, "lat": 48.8556 },
+    { "name": "Kostiantynivka",    "lon": 37.7167, "lat": 48.5333 },
+    { "name": "Pokrovsk",          "lon": 37.1761, "lat": 48.2814 },
+    { "name": "Toretsk",           "lon": 37.8556, "lat": 48.4031 },
+    { "name": "Mariinka",          "lon": 37.5006, "lat": 47.9450 },
+    { "name": "Vuhledar",          "lon": 37.2497, "lat": 47.7806 },
+    { "name": "Horlivka",          "lon": 38.0500, "lat": 48.3336 },
+    { "name": "Makiivka",          "lon": 37.9658, "lat": 48.0478 },
+    { "name": "Lyman",             "lon": 37.8022, "lat": 48.9847 },
+    { "name": "Druzhkivka",        "lon": 37.5267, "lat": 48.6178 },
+    { "name": "Kurakhove",         "lon": 37.2814, "lat": 47.9836 },
+    { "name": "Yenakiieve",        "lon": 38.2114, "lat": 48.2317 },
+    { "name": "Debaltseve",        "lon": 38.4153, "lat": 48.3411 },
+    { "name": "Popasna",           "lon": 38.3650, "lat": 48.6347 },
+    { "name": "Polohy",            "lon": 36.2553, "lat": 47.4844 },
+    { "name": "Huliaipole",        "lon": 36.2569, "lat": 47.6594 }
+  ]
+}

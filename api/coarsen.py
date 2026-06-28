@@ -108,9 +108,22 @@ def coarsen_event(row: dict) -> dict:
     cell_id = row["cell_id"]
     out = dict(row)
     out["cell_id"] = cell_id
-    out["centroid"] = cell_geometry(cell_id, "cell_centroid")
+    centroid = cell_geometry(cell_id, "cell_centroid")
+    out["centroid"] = centroid
     out["geometry"] = cell_geometry(cell_id, "cell_polygon")
+    # Human-readable place name from the (already-coarse) centroid — "Avdiivka", not a cell code.
+    out["place"] = _place_label(centroid)
     return out
+
+
+def _place_label(centroid: dict) -> dict | None:
+    """Nearest-settlement label for a cell centroid Point geometry (best-effort, never fatal)."""
+    try:
+        from api.places import nearest_place
+        lon, lat = centroid["coordinates"]
+        return nearest_place(lon, lat)
+    except Exception:  # noqa: BLE001 — a place label is a nicety; never break the event payload
+        return None
 
 
 def coarsen_cell(row: dict) -> dict:

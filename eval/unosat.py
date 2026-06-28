@@ -225,6 +225,11 @@ def main():
     truth = truth_cells(load_unosat_features(args.labels), bbox, grades)
 
     if args.detections_file:
+        if not Path(args.detections_file).exists():
+            print(f"No such detections file: {args.detections_file}\n"
+                  f"(That was only an example name. Pass a JSON file containing a list of cell ids, "
+                  f"or omit --detections-file to read the SAR detections from the database.)")
+            raise SystemExit(2)
         detected = _detection_cells_from_file(args.detections_file)
     else:
         import psycopg2
@@ -233,6 +238,18 @@ def main():
             detected = detection_cells_from_db(conn, args.theater)
         finally:
             conn.close()
+
+    if not detected:
+        print("=" * 60)
+        print("No SAR detections found yet — nothing to score.")
+        print("=" * 60)
+        print(f"UNOSAT ground truth is ready: {len(truth)} damage cells in the {args.theater} AOI.")
+        print("Run the detector first, then re-run this:")
+        print("  python -m ingest.imagery.run --detector sar_logratio \\")
+        print("      --before 2024-01-01 2024-01-31 --after 2024-02-15 2024-03-15")
+        print("  python -m fusion.run --theater " + args.theater)
+        print("  python -m eval.unosat --theater " + args.theater)
+        raise SystemExit(0)
 
     overall = score(detected, truth, args.buffer_m)
     by_grade = recall_by_grade(detected, truth, args.buffer_m)
