@@ -10,12 +10,20 @@ const API = "";                       // same origin (served by the API at /ui/)
 let THEATER = "ua_donbas";
 let map, eventLayer, selectedLayer;
 
+// Plain confidence labels + colours mirror the styles.css --band-* tokens (single source of truth).
 const BANDS = {
-  High:    { cls: "high",    color: "#22c55e", meaning: "confirmed by several independent sources" },
-  Medium:  { cls: "medium",  color: "#eab308", meaning: "partly confirmed" },
-  Low:     { cls: "low",     color: "#f97316", meaning: "weak signal" },
-  Rumored: { cls: "rumored", color: "#94a3b8", meaning: "single source / not yet confirmed" },
+  High:    { cls: "high",    color: "#ff5a52", plain: "Confirmed",        meaning: "confirmed by several independent sources" },
+  Medium:  { cls: "medium",  color: "#ffb13d", plain: "Partly confirmed", meaning: "partly confirmed" },
+  Low:     { cls: "low",     color: "#4ea3ff", plain: "Weak",             meaning: "weak signal" },
+  Rumored: { cls: "rumored", color: "#8b93a4", plain: "Rumored",          meaning: "single source / not yet confirmed" },
 };
+// Classify a report's source family for the colour-coded evidence timeline.
+function srcKind(o) {
+  const m = (o.modality || "").toLowerCase(), f = (o.source_family_id || "").toLowerCase();
+  if (m === "imagery" || f.includes("copernicus") || f.includes("sentinel")) return { k: "sat", label: "Satellite radar" };
+  if (m === "thermal" || f.includes("firms") || f.includes("modis")) return { k: "thermal", label: "Thermal / fire" };
+  return { k: "news", label: "News report" };
+}
 const UNCORROBORATED = ["single-source", "echo-only", "verification-needed"];
 const FLAG_PLAIN = {
   "single-source": "Only one source — not independently confirmed.",
@@ -73,7 +81,7 @@ function renderLegend() {
   document.getElementById("legend").innerHTML =
     `<h4>What the colours mean</h4>` +
     Object.entries(BANDS).map(([b, d]) =>
-      `<div class="row"><span class="dot" style="background:${d.color}"></span>${b} — ${d.meaning}</div>`).join("");
+      `<div class="row"><span class="dot" style="background:${d.color}"></span><b>${d.plain}</b> — ${d.meaning}</div>`).join("");
 }
 function drawEvents(events) {
   eventLayer.clearLayers();
@@ -84,11 +92,28 @@ function drawEvents(events) {
       L.geoJSON(ev.geometry, {
         style: { color, weight: 1, fillColor: color, fillOpacity: 0.4 },
       }).on("click", () => selectEvent(ev.event_id)).addTo(eventLayer);
-    } else if (ev.centroid && ev.centroid.coordinates) {
+    }
+    if (ev.centroid && ev.centroid.coordinates) {
       const [lon, lat] = ev.centroid.coordinates;
       L.circleMarker([lat, lon], { radius: 6, color, fillColor: color, fillOpacity: 0.7 })
         .on("click", () => selectEvent(ev.event_id)).addTo(eventLayer);
+      // Named place label on the map for corroborated (non-Rumored) events — the map upgrade.
+      if (band !== "Rumored" && ev.place && ev.place.label) {
+        L.marker([lat, lon], { interactive: false,
+          icon: L.divIcon({ className: "place-label", html: esc(ev.place.label), iconAnchor: [-12, 8] }) })
+          .addTo(eventLayer);
+      }
     }
+  }
+  const chip = document.getElementById("mapChipN");
+  if (chip) chip.textContent = events.length;
+}
+function setSummary(events) {
+  const counts = { total: events.length, High: 0, Medium: 0, Low: 0, Rumored: 0 };
+  for (const ev of events) counts[bandOf(ev)]++;
+  for (const [k, v] of Object.entries(counts)) {
+    const el = document.querySelector(`[data-count="${k}"]`);
+    if (el) el.textContent = v;
   }
 }
 function focusEvent(ev) {
@@ -128,9 +153,13 @@ async function loadEvents() {
   } catch (e) { document.getElementById("eventList").innerHTML = `<div class="empty">Couldn't load events: ${esc(e.message)}</div>`; return; }
   const events = (data && data.events) || [];
   drawEvents(events);
+  if (!band) setSummary(events);   // the top strip is a global overview — only refresh it when unfiltered
   const list = document.getElementById("eventList");
   if (!events.length) { list.className = "empty"; list.textContent = "No events to show for this area yet."; return; }
   list.className = "";
+  // Corroborated events first (the named, high-confidence incidents lead the feed).
+  const rank = { High: 0, Medium: 1, Low: 2, Rumored: 3 };
+  events.sort((a, b) => rank[bandOf(a)] - rank[bandOf(b)]);
   list.innerHTML = `<div class="hint">${events.length} event(s). Tap one to see where it came from.</div>` +
     events.map(cardHTML).join("");
   list.querySelectorAll(".card").forEach((c) => (c.onclick = () => selectEvent(c.dataset.id)));
@@ -139,12 +168,12 @@ function placeLabel(ev) { return (ev.place && ev.place.label) || ("area " + ev.c
 function cardHTML(ev) {
   const band = bandOf(ev);
   const warn = (ev.flags || []).some((f) => UNCORROBORATED.includes(f)) ? "⚠ " : "";
-  return `<div class="card" data-id="${esc(ev.event_id)}">
+  return `<div class="card" data-id="${esc(ev.event_id)}" data-band="${band}">
     <div class="card-top">
-      <span class="etype">${warn}${esc(placeLabel(ev))}</span>
-      <span class="pill ${BANDS[band].cls}">${band}</span>
+      <span class="etype">${warn}${esc(placeLabel(ev))}<span class="type"> · ${esc(ev.event_type)}</span></span>
+      <span class="pill ${BANDS[band].cls}">${BANDS[band].plain}</span>
     </div>
-    <div class="meta" style="text-transform:capitalize">${esc(ev.event_type)} · ${esc(ev.n_independent_families ?? 0)} independent source(s)</div>
+    <div class="meta">${esc(ev.n_independent_families ?? 0)} independent source(s)</div>
   </div>`;
 }
 
@@ -162,11 +191,13 @@ async function selectEvent(id) {
   const conf = typeof ev.confidence === "number" ? Math.round(ev.confidence * 100) + "%" : "—";
   const warns = flags.filter((f) => FLAG_PLAIN[f]).map((f) => `<div class="warnflag">⚑ ${FLAG_PLAIN[f]}</div>`).join("");
 
-  const evidence = (ev.observations || []).map((o) => `
-    <div class="evidence">
-      <div class="when">${esc(o.occurred_at || "time unknown")} · <span class="src">${esc(o.source_family_id || "source")}</span> · ${esc(o.modality || "?")} / ${esc(o.obs_type || "?")}</div>
+  const evidence = (ev.observations || []).map((o) => {
+    const s = srcKind(o);
+    return `<div class="evidence src-${s.k}">
+      <div class="when"><span class="src-tag ${s.k}">${s.label}</span> · ${esc(o.occurred_at || "time unknown")}</div>
       ${o.excerpt ? `<blockquote>${esc(o.excerpt)}</blockquote>` : ""}
-    </div>`).join("") || `<div class="muted">No reports attached.</div>`;
+    </div>`;
+  }).join("") || `<div class="muted">No reports attached.</div>`;
 
   const ctxFields = [["label","Area name"],["admin_l1","Region"],["admin_l2","District"],
     ["admin_l3","Locality"],["landcover_label","Land type"],["builtup_pct","Built-up %"],
@@ -177,10 +208,11 @@ async function selectEvent(id) {
 
   panel.innerHTML = `
     <span class="backlink" id="back">‹ Back to events</span>
-    <h2 style="margin:.2em 0">${esc(placeLabel(ev))} <span class="pill ${BANDS[band].cls}">${band}</span></h2>
+    <h2 style="margin:.2em 0">${esc(placeLabel(ev))} <span class="pill ${BANDS[band].cls}">${BANDS[band].plain}</span></h2>
     <div class="muted" style="text-transform:capitalize;margin-bottom:4px">${esc(ev.event_type)}${ev.place && ev.place.distance_km != null ? ` · ~${ev.place.distance_km} km from ${esc(ev.place.name)}` : ""}</div>
     <div class="code">area ${esc(ev.cell_id)} · id ${esc(ev.event_id)}</div>
     ${warns}
+    <div class="why" data-band="${band}"><p><b>Why “${BANDS[band].plain}”?</b> ${BANDS[band].meaning}.</p></div>
     <div class="metrics">
       <div class="metric"><div class="v">${esc(ev.n_sources ?? 0)}</div><div class="k">reports</div></div>
       <div class="metric"><div class="v">${esc(ev.n_independent_families ?? 0)}</div><div class="k">independent sources</div></div>
