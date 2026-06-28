@@ -181,6 +181,39 @@ def cached_detect(detector, tiles, cache: DetectionCache, resolver,
     return out, rejected
 
 
+def stack_hash(tiles: list[Tile]) -> str:
+    """A stable hash over a SET of tiles (order-independent), for multi-tile detectors whose
+    cache key is the whole input stack, not a single granule."""
+    h = hashlib.sha256()
+    for th in sorted(tile_hash(t) for t in tiles):
+        h.update(th.encode())
+    return h.hexdigest()
+
+
+def cached_detect_multi(detector, tiles, cache: DetectionCache, resolver,
+                        theater_id: str) -> tuple[list[CachedDetection], list[str]]:
+    """Replay-safe caching for MULTI-tile detectors (change detection).
+
+    Unlike cached_detect (per-tile), a change detector needs the whole before/after stack in one
+    infer() call, so the cache key is over the combined stack (stack_hash), not a single tile.
+    Otherwise identical: coarsen + band once at the boundary, store the coarsened cell-only form;
+    a hit reuses it and never re-runs the model or re-hits GEE.
+    """
+    key = DetectionKey(stack_hash(tiles), detector.model_digest, detector.name)
+    cached = cache.get(key)
+    rejected: list[str] = []
+    if cached is None:
+        cached = []
+        for raw in detector.infer(tiles):
+            cd = coarsen_detection(raw, resolver, theater_id)
+            if cd is None:
+                rejected.append("no_cell_resolve")
+                continue
+            cached.append(cd)
+        cache.put(key, cached)
+    return cached, rejected
+
+
 def detections_to_observations(cds: list[CachedDetection], source_id: str, family_id: str,
                                theater_id: str, taxonomy: Optional[dict] = None, embedder=None):
     """Turn coarsened detections into Observations via the pre-coarsened contract entry point.

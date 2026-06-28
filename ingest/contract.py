@@ -260,6 +260,21 @@ def observation_from_cell(
     )
 
 
+def persist_observation(conn, obs: Observation, bus: Optional[Bus] = None) -> tuple[Optional[str], Optional[str]]:
+    """Append-only write of an ALREADY-COARSENED Observation (the imagery-detector path).
+
+    Imagery observations are built pre-coarsened via observation_from_cell (cell_id authoritative,
+    no resolver), so they skip normalize() and enter the log here. Returns (obs_id, None) on
+    insert or (None, 'exact_dup') on a content_hash conflict — never a silent drop.
+    """
+    inserted = _write_observation(conn, obs)
+    if not inserted:
+        return None, "exact_dup"
+    if bus is not None:
+        bus.publish("observation.ingested", {"obs_id": obs.obs_id, "cell_id": obs.cell_id})
+    return obs.obs_id, None
+
+
 def ingest_one(
     raw: RawObservation,
     resolver: CellResolver,
