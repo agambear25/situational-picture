@@ -135,15 +135,16 @@ async function loadEvents() {
     events.map(cardHTML).join("");
   list.querySelectorAll(".card").forEach((c) => (c.onclick = () => selectEvent(c.dataset.id)));
 }
+function placeLabel(ev) { return (ev.place && ev.place.label) || ("area " + ev.cell_id); }
 function cardHTML(ev) {
   const band = bandOf(ev);
   const warn = (ev.flags || []).some((f) => UNCORROBORATED.includes(f)) ? "⚠ " : "";
   return `<div class="card" data-id="${esc(ev.event_id)}">
     <div class="card-top">
-      <span class="etype">${warn}${esc(ev.event_type)}</span>
+      <span class="etype">${warn}${esc(placeLabel(ev))}</span>
       <span class="pill ${BANDS[band].cls}">${band}</span>
     </div>
-    <div class="meta">${esc(ev.n_independent_families ?? 0)} independent source(s) · area ${esc(ev.cell_id)}</div>
+    <div class="meta" style="text-transform:capitalize">${esc(ev.event_type)} · ${esc(ev.n_independent_families ?? 0)} independent source(s)</div>
   </div>`;
 }
 
@@ -176,7 +177,8 @@ async function selectEvent(id) {
 
   panel.innerHTML = `
     <span class="backlink" id="back">‹ Back to events</span>
-    <h2 style="margin:.2em 0;text-transform:capitalize">${esc(ev.event_type)} <span class="pill ${BANDS[band].cls}">${band}</span></h2>
+    <h2 style="margin:.2em 0">${esc(placeLabel(ev))} <span class="pill ${BANDS[band].cls}">${band}</span></h2>
+    <div class="muted" style="text-transform:capitalize;margin-bottom:4px">${esc(ev.event_type)}${ev.place && ev.place.distance_km != null ? ` · ~${ev.place.distance_km} km from ${esc(ev.place.name)}` : ""}</div>
     <div class="code">area ${esc(ev.cell_id)} · id ${esc(ev.event_id)}</div>
     ${warns}
     <div class="metrics">
