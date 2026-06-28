@@ -19,11 +19,9 @@ def to_cell_id(lon: float, lat: float) -> str:
     """
     # MGRS at 1km resolution = 5-digit easting + 5-digit northing = 10 chars total
     # e.g. '37UDB1234556789' → cell_id = '37UDB1234556789' (grid square 37UDB at 1km)
-    raw = _M.toMGRS(lat, lon, MGRSPrecision=4)  # precision=4 → 8-digit = 100m
-    # Re-snap to 1km (precision=3 → 6-digit, but MGRS lib uses 1km = precision=3... check)
-    # Actually: precision=3 = 1km (6 digits total per easting/northing), precision=4 = 100m
-    # We want 1km → precision=3
-    raw = _M.toMGRS(lat, lon, MGRSPrecision=3)
+    # MGRSPrecision=2 → 1km resolution → 4 trailing digits (2 easting + 2 northing)
+    # e.g. '37UDB1234' — this is the canonical 1km cell_id format.
+    raw = _M.toMGRS(lat, lon, MGRSPrecision=2)
     return raw.replace(" ", "")
 
 

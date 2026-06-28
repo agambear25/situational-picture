@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional
 
 
-CELL_ID_RE = re.compile(r"^[0-9]{1,2}[A-Z][A-Z]{2}[0-9]{10}$")
+CELL_ID_RE = re.compile(r"^[0-9]{1,2}[A-Z]{3}[0-9]{4}$")
 
 
 class GeoPrecision(str, Enum):

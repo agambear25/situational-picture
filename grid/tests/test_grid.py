@@ -16,9 +16,9 @@ from grid.types import Cell, CellResolution, GeoPrecision, is_valid_cell_id
 
 def test_local_seq_deterministic():
     cells = [
-        {"cell_id": "37UDB000000", "admin_l3": "Avdiivka"},
-        {"cell_id": "37UDB000001", "admin_l3": "Avdiivka"},
-        {"cell_id": "37UDB000002", "admin_l3": "Donetsk"},
+        {"cell_id": "37UDB0000", "admin_l3": "Avdiivka"},
+        {"cell_id": "37UDB0001", "admin_l3": "Avdiivka"},
+        {"cell_id": "37UDB0002", "admin_l3": "Donetsk"},
     ]
     seqs = assign_local_seqs(cells)
     # Same call twice must produce same result
@@ -27,14 +27,14 @@ def test_local_seq_deterministic():
     avdiivka_seqs = {c["cell_id"]: seqs[c["cell_id"]] for c in cells if c["admin_l3"] == "Avdiivka"}
     assert sorted(avdiivka_seqs.values()) == [1, 2]
     # Donetsk cell gets seq 1 in its own group
-    assert seqs["37UDB000002"] == 1
+    assert seqs["37UDB0002"] == 1
 
 
 def test_local_seq_order_independence():
     """Seq should be the same regardless of input order (sorting is internal)."""
     cells_a = [
-        {"cell_id": "37UDB000000", "admin_l3": "Test"},
-        {"cell_id": "37UDB000001", "admin_l3": "Test"},
+        {"cell_id": "37UDB0000", "admin_l3": "Test"},
+        {"cell_id": "37UDB0001", "admin_l3": "Test"},
     ]
     cells_b = list(reversed(cells_a))
     assert assign_local_seqs(cells_a) == assign_local_seqs(cells_b)
@@ -57,7 +57,7 @@ def test_cell_rejects_bad_id():
 
 def test_cell_resolution_no_precise_coord():
     """CellResolution must not expose the precise input coordinate."""
-    cell = Cell(cell_id="37UDB123456", theater_id="ua_donbas", label="Test-1")
+    cell = Cell(cell_id="37UDB1234", theater_id="ua_donbas", label="Test-1")
     res = CellResolution(cell=cell, precision=GeoPrecision.PRECISE)
     # The resolution has no 'lon', 'lat', or 'geom' field
     assert not hasattr(res, "lon")
@@ -66,7 +66,7 @@ def test_cell_resolution_no_precise_coord():
 
 
 def test_place_only_flagged():
-    cell = Cell(cell_id="37UDB123456", theater_id="ua_donbas", label="Test-1")
+    cell = Cell(cell_id="37UDB1234", theater_id="ua_donbas", label="Test-1")
     res = CellResolution(
         cell=cell,
         precision=GeoPrecision.PLACE_ONLY,
