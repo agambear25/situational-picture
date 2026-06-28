@@ -15,13 +15,23 @@ GRANT SELECT ON ALL TABLES IN SCHEMA world TO cop_api;
 GRANT SELECT ON ALL TABLES IN SCHEMA geo TO cop_api;
 GRANT SELECT ON ALL TABLES IN SCHEMA ml TO cop_api;
 
--- API may append to review_annotation only (no UPDATE/DELETE — enforced by triggers)
+-- The append-only log is READABLE for the evidence trail (GET /events/{id}) and the
+-- no-drop ledger (GET /rejections) — these are core analytical-honesty surfaces.
+-- Read-only: SELECT only; the API is never granted INSERT/UPDATE/DELETE here, and the
+-- append-only triggers in 0003 block writes even if a grant were ever added by mistake.
+GRANT USAGE ON SCHEMA log TO cop_api;
+GRANT SELECT ON log.observation TO cop_api;
+GRANT SELECT ON log.obs_rejection TO cop_api;
+
+-- API may APPEND ONLY to the two human-in-the-loop annotation tables (no UPDATE/DELETE —
+-- enforced by triggers in 0006/0007). Everything else in the engine write-path is unreachable.
 GRANT INSERT ON world.review_annotation TO cop_api;
+GRANT INSERT ON world.label_annotation TO cop_api;
 
--- Explicitly deny write access to the append-only log
-REVOKE ALL ON log.observation FROM cop_api;
-REVOKE ALL ON log.obs_rejection FROM cop_api;
+-- Explicitly deny WRITE access to the append-only log (defense in depth; SELECT above stands).
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON log.observation FROM cop_api;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON log.obs_rejection FROM cop_api;
 
--- Future tables inherit
+-- Future tables inherit read-only
 ALTER DEFAULT PRIVILEGES IN SCHEMA world GRANT SELECT ON TABLES TO cop_api;
 ALTER DEFAULT PRIVILEGES IN SCHEMA geo GRANT SELECT ON TABLES TO cop_api;

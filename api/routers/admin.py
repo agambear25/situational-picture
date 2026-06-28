@@ -1,0 +1,98 @@
+"""Admin/ops router: health, the no-drop rejection ledger, replay audit, and an insights stub.
+
+These endpoints are the operator-facing proof surface for the COP's integrity claims:
+- /healthz answers WITHOUT a DB dependency so liveness probes still report when the DB is down,
+  and it surfaces the live-feed GATE flag (config/runtime.yaml) that keeps feeds off until eval passes.
+- /rejections exposes the no-drop ledger: every observation that did NOT become an event is
+  accounted for with a reason, so "nothing was silently swallowed" is verifiable, not asserted.
+- /admin/replay runs a READ-ONLY determinism + no-drop audit; it re-derives events in memory and
+  compares digests. It never rebuilds or writes — read-only role only.
+- /insights is an honest stub: the assessment layer is Phase 4 and we say so rather than faking it.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import yaml
+from fastapi import APIRouter, Depends, Query
+
+from api.deps import get_conn, get_settings
+from api import queries
+
+router = APIRouter()
+
+# runtime.yaml holds the live-feed GATE flag. Resolve relative to the repo root
+# (api/routers/admin.py -> parents[2]) so the path is stable regardless of CWD.
+_RUNTIME_YAML = Path(__file__).resolve().parents[2] / "config" / "runtime.yaml"
+
+
+def _load_runtime() -> dict:
+    """Read config/runtime.yaml live. Read fresh per request (not cached) so flipping the GATE
+    flag is reflected without a process restart; tolerate a missing/empty file by returning {}."""
+    if not _RUNTIME_YAML.exists():
+        return {}
+    with _RUNTIME_YAML.open("r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    # runtime.yaml nests everything under a top-level "runtime:" key.
+    return data.get("runtime", {})
+
+
+@router.get("/healthz")
+def healthz() -> dict:
+    """Liveness + posture probe. NO DB dependency on purpose: a DB outage must still return a
+    response so operators can distinguish "API down" from "DB down", and so the GATE flag and
+    read-only posture remain inspectable while degraded."""
+    s = get_settings()
+    runtime = _load_runtime()
+    return {
+        "status": "ok",
+        "read_only": s["read_only_mode"],
+        "live_feeds_enabled": bool(runtime.get("live_feeds_enabled", False)),
+        "theater": s["default_theater"],
+    }
+
+
+@router.get("/rejections")
+def rejections(
+    theater_id: str | None = Query(default=None),
+    limit: int = Query(default=200),
+    conn=Depends(get_conn),
+) -> dict:
+    """The no-drop ledger: a summary tally plus the per-row reasons for observations that were
+    not placed into events. This is the auditable proof that non-placed obs are accounted for."""
+    s = get_settings()
+    theater_id = theater_id or s["default_theater"]
+    # Cap the page size to the configured ceiling rather than trusting client input.
+    limit = min(limit, s["max_page_size"])
+    return {
+        "summary": queries.rejection_summary(conn, theater_id),
+        "rejections": queries.list_rejections(conn, theater_id, limit),
+    }
+
+
+@router.get("/insights")
+def insights() -> dict:
+    """Honest stub for the Phase 4 assessment layer. We return availability=False rather than
+    inventing scores, so consumers never mistake an empty/placeholder for a real assessment."""
+    return {
+        "status": "stub",
+        "available": False,
+        "message": (
+            "Assessment layer (significance/anomaly/mobility/flood/exposure/gaps) "
+            "lands in Phase 4."
+        ),
+    }
+
+
+@router.post("/admin/replay")
+def admin_replay(
+    theater_id: str | None = Query(default=None),
+    conn=Depends(get_conn),
+) -> dict:
+    """READ-ONLY determinism + no-drop audit. Re-derives events from observations in memory and
+    compares against materialized state; reports bit_identical and any dropped obs. It does NOT
+    rebuild or write — hence get_conn (read-only role), despite being a POST."""
+    s = get_settings()
+    theater_id = theater_id or s["default_theater"]
+    return queries.replay_check(conn, theater_id)
