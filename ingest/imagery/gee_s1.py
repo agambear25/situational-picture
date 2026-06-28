@@ -45,7 +45,12 @@ _INITIALIZED = False
 # ---------------------------------------------------------------------------
 
 def initialize(project: Optional[str] = None) -> None:
-    """Initialize GEE (idempotent). project=None → noncommercial research, no billing.
+    """Initialize GEE (idempotent).
+
+    project resolution order:
+      1. explicit argument
+      2. GEE_PROJECT env var  (set this in .env: GEE_PROJECT=urban-flood-analysis-ncr-in)
+      3. project field in ~/.config/earthengine/credentials (if present)
 
     Reads OAuth credentials from $GEE_CREDENTIALS_PATH or the default location
     ~/.config/earthengine/credentials (written by 'earthengine authenticate').
@@ -57,6 +62,8 @@ def initialize(project: Optional[str] = None) -> None:
         return
     import ee  # lazy — not imported at module level so offline tests can load this file
 
+    resolved_project = project or os.environ.get("GEE_PROJECT") or None
+
     creds_override = os.environ.get("GEE_CREDENTIALS_PATH")
     if creds_override:
         import json
@@ -65,13 +72,13 @@ def initialize(project: Optional[str] = None) -> None:
         credentials = ee.ServiceAccountCredentials(
             info.get("client_email", ""), key_data=info.get("private_key", "")
         )
-        ee.Initialize(credentials=credentials, project=project or None)
+        ee.Initialize(credentials=credentials, project=resolved_project)
     else:
         # Personal OAuth2 (default path, written by 'earthengine authenticate')
-        ee.Initialize(project=project or None)
+        ee.Initialize(project=resolved_project)
 
     _INITIALIZED = True
-    log.info("GEE initialised (project=%s)", project or "none/noncommercial")
+    log.info("GEE initialised (project=%s)", resolved_project or "from credentials file")
 
 
 def reset_for_tests() -> None:
@@ -137,13 +144,25 @@ class TileDownloader(Protocol):
 class GeeDownloader:
     """Talks to the live GEE API. Requires initialize() to have been called."""
 
+    @staticmethod
+    def _spec_to_filter(spec: dict):
+        import ee
+        t = spec["type"]
+        if t == "eq":
+            return ee.Filter.eq(spec["name"], spec["value"])
+        if t == "list_contains":
+            return ee.Filter.listContains(spec["name"], spec["value"])
+        if t == "lt":
+            return ee.Filter.lt(spec["name"], spec["value"])
+        raise ValueError(f"unknown filter spec type {t!r}")
+
     def list_granules(self, collection, aoi_bbox, start, end, extra_filters) -> list[GranuleInfo]:
         import ee
         w, s, e, n = aoi_bbox
         aoi = ee.Geometry.BBox(w, s, e, n)
         col = ee.ImageCollection(collection).filterBounds(aoi).filterDate(start, end)
-        for filt in extra_filters.get("ee_filters", []):
-            col = col.filter(filt)
+        for spec in extra_filters.get("filter_specs", []):
+            col = col.filter(self._spec_to_filter(spec))
         ids = col.aggregate_array("system:index").getInfo()
         starts = col.aggregate_array("system:time_start").getInfo()  # ms epoch
         ends = col.aggregate_array("system:time_end").getInfo()
@@ -232,9 +251,7 @@ def fetch_s1_tiles(
         collection=_S1_COLLECTION,
         bands=bands,
         source_prefix=source_prefix,
-        extra_filters={
-            "ee_filters": _s1_ee_filters(polarization),
-        },
+        extra_filters={"filter_specs": _s1_filter_specs(polarization)},
         downloader=downloader,
         cache=cache,
         scale_m=scale_m,
@@ -242,21 +259,14 @@ def fetch_s1_tiles(
     )
 
 
-def _s1_ee_filters(polarization: str) -> list:
-    """Return ee.Filter objects for S1 IW GRD in the requested polarisation.
-
-    Returns [] when ee is not installed (offline tests with a FakeDownloader).
-    FakeDownloader ignores extra_filters entirely, so the empty list is safe.
-    """
-    try:
-        import ee
-        return [
-            ee.Filter.eq("instrumentMode", "IW"),
-            ee.Filter.listContains("transmitterReceiverPolarisation", polarization),
-            ee.Filter.eq("orbitProperties_pass", "ASCENDING"),  # consistent geometry
-        ]
-    except ImportError:
-        return []
+def _s1_filter_specs(polarization: str) -> list[dict]:
+    """Plain-dict filter specs — no ee import needed. GeeDownloader converts these to
+    ee.Filter objects inside list_granules(). FakeDownloader ignores them entirely."""
+    return [
+        {"type": "eq",            "name": "instrumentMode",                    "value": "IW"},
+        {"type": "list_contains", "name": "transmitterReceiverPolarisation",   "value": polarization},
+        {"type": "eq",            "name": "orbitProperties_pass",              "value": "ASCENDING"},
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -322,15 +332,11 @@ def _fetch(
     # Cloud filter is an ee-side filter for S2 only; pass through extra_filters so GeeDownloader
     # can apply it. Fake downloaders receive it too and may ignore it — that's fine for tests.
     if "cloud_pct" in extra_filters:
-        cp = extra_filters["cloud_pct"]
         extra_filters = dict(extra_filters)  # don't mutate caller's dict
-        try:
-            import ee
-            extra_filters["ee_filters"] = extra_filters.get("ee_filters", []) + [
-                ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", cp)
-            ]
-        except ImportError:
-            pass  # offline test — downloader mock handles it
+        extra_filters.setdefault("filter_specs", [])
+        extra_filters["filter_specs"] = extra_filters["filter_specs"] + [
+            {"type": "lt", "name": "CLOUDY_PIXEL_PERCENTAGE", "value": extra_filters.pop("cloud_pct")}
+        ]
 
     granules = _dl.list_granules(collection, bbox, start, end, extra_filters)[:max_granules]
     log.info("GEE %s: %d granules found (%s → %s)", collection, len(granules), start, end)
