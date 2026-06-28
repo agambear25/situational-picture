@@ -186,6 +186,10 @@ def test_initialize_accepts_none_project(monkeypatch):
     to ee.Initialize, which is what GEE noncommercial research requires.
     """
     reset_for_tests()
+    # Hermetic: GEE_PROJECT may be set in the developer's real environment (.env). The
+    # no-project case must be tested with it cleared, since initialize() now resolves the
+    # project from GEE_PROJECT when no explicit argument is passed.
+    monkeypatch.delenv("GEE_PROJECT", raising=False)
 
     captured = {}
     class FakeEE:
@@ -201,5 +205,12 @@ def test_initialize_accepts_none_project(monkeypatch):
 
     assert captured.get("project") is None, \
         "initialize must pass project=None to ee.Initialize (noncommercial — no billing)"
+
+    # And when GEE_PROJECT is set, it must be honored (precedence: arg > env > credentials file).
+    reset_for_tests()
+    monkeypatch.setenv("GEE_PROJECT", "ee-test-project")
+    captured.clear()
+    gee_s1.initialize()
+    assert captured.get("project") == "ee-test-project"
 
     reset_for_tests()   # clean up so other tests aren't affected

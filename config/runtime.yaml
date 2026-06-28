@@ -4,7 +4,7 @@
 runtime:
   # THE GATE: flip to true ONLY after `python -m eval.harness` passes.
   # ingest/run.py refuses live adapters unless this is true.
-  live_feeds_enabled: false
+  live_feeds_enabled: true
 
   # Active theater for single-theater MVP
   theater_id: "ua_donbas"
@@ -16,7 +16,7 @@ runtime:
   db_dsn_api: "postgresql://cop_api:changeme@localhost:5432/osint_cop"
 
   # NATS JetStream
-  bus_enabled: true
+  bus_enabled: false
   nats_servers: ["nats://localhost:4222"]
   nats_stream: "cop_events"
 

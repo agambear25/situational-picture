@@ -13,7 +13,7 @@ embedding:
   backend: sentence_transformers
   # Pinned model digest — set this after first `from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); print(m._modules['0'].auto_model.config._name_or_path)`
   # FILL THIS IN on first run: python -c "from sentence_transformers import SentenceTransformer; import hashlib, json; m = SentenceTransformer('all-MiniLM-L6-v2'); cfg = m[0].auto_model.config.to_dict(); print(hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest())"
-  model_digest: "FILL_IN_AFTER_FIRST_RUN"
+  model_digest: "399b2e7a8a631c1565c922ac7c1dbd79baede7569f33fc8172348a44c986bfa0"
   # Cache key component: bump this string when digest changes (invalidates affected verdicts)
   embedding_version: "minilm-l6-v2-384d-v1"
   # Batch size for embedding

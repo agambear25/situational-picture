@@ -12,7 +12,7 @@ share a cell-hour — matching the intended (sensor, acq_dt, cell, frp) dedup ke
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Iterable, Optional
 
 from geo.control import assert_source_permitted
@@ -65,7 +65,11 @@ def parse_firms_row(row: dict, source_id: str, family_id: str,
     return RawObservation(
         theater_id=theater_id, source_id=source_id, source_family_id=family_id,
         modality="thermal", obs_type="fire",
-        occurred_start=acq, occurred_end=acq, geo=GeoRef(lon=lon, lat=lat, precision_m=375.0),
+        # A detection is instantaneous, but the range must be non-empty: tstzrange(x, x, '[)')
+        # is EMPTY and reads back as NULL. Give it a 1-hour validity window (the overpass/hour
+        # bucket the dedup key already uses), so lower()/upper() round-trip correctly.
+        occurred_start=acq, occurred_end=acq + timedelta(hours=1),
+        geo=GeoRef(lon=lon, lat=lat, precision_m=375.0),
         text=text, lang="en", self_conf=_self_conf(conf),
         meta={"satellite": sat, "frp": frp, "confidence": conf,
               "bright_ti4": row.get("bright_ti4"), "daynight": row.get("daynight")},

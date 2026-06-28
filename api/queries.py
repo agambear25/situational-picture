@@ -358,8 +358,23 @@ def _event_row(r) -> dict:
         "resolved_precision_m": r[4], "occurred_start": _iso(r[5]), "occurred_end": _iso(r[6]),
         "status": r[7], "confidence": r[8], "confidence_band": r[9], "n_sources": r[10],
         "n_independent_families": r[11], "flags": list(r[12] or []),
-        "created_from_obs": [str(x) for x in (r[13] or [])], "updated_at": _iso(r[14]),
+        "created_from_obs": _uuid_array(r[13]), "updated_at": _iso(r[14]),
     }
+
+
+def _uuid_array(v) -> list[str]:
+    """Normalize a uuid[] column to a list of strings.
+
+    psycopg2 parses text[] into a Python list, but returns uuid[] as its raw array text form
+    '{uuid1,uuid2}' (no uuid array caster registered). Iterating that string yields characters,
+    so we parse it explicitly; an already-parsed list/tuple is coerced to strings.
+    """
+    if v is None:
+        return []
+    if isinstance(v, str):
+        inner = v.strip().lstrip("{").rstrip("}").strip()
+        return [x.strip().strip('"') for x in inner.split(",")] if inner else []
+    return [str(x) for x in v]
 
 
 def _iso(v):

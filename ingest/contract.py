@@ -16,7 +16,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Protocol, runtime_checkable
 
 
@@ -336,6 +336,13 @@ def _write_observation(conn, obs: Observation) -> bool:
     """Append-only insert. Returns False if content_hash already present (exact dup)."""
     from psycopg2 import errors  # lazy
     emb = list(obs.embedding) if obs.embedding else None
+    # Guard against an empty tstzrange: tstzrange(x, x, '[)') is EMPTY and reads back with
+    # NULL bounds, silently losing the timestamp. An instantaneous observation must still
+    # occupy a non-empty half-open interval — bump the end by 1s if it is not strictly after.
+    occ_start = obs.occurred_start
+    occ_end = obs.occurred_end
+    if occ_end is None or occ_end <= occ_start:
+        occ_end = occ_start + timedelta(seconds=1)
     with conn.cursor() as cur:
         try:
             cur.execute(
@@ -352,7 +359,7 @@ def _write_observation(conn, obs: Observation) -> bool:
                 """,
                 (
                     obs.obs_id, obs.theater_id, obs.source_id, obs.source_family_id,
-                    obs.modality, obs.obs_type, obs.occurred_start, obs.occurred_end,
+                    obs.modality, obs.obs_type, occ_start, occ_end,
                     obs.cell_id, obs.geom_precision_m, obs.place_id, obs.text, emb,
                     obs.content_hash, obs.lang, obs.self_conf, _json(obs.meta),
                 ),

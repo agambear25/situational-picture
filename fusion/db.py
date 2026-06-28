@@ -6,6 +6,7 @@ import so the pure fusion path and the eval harness never require a database.
 from __future__ import annotations
 
 from datetime import timezone
+from typing import Optional
 
 from ingest.contract import Observation
 
@@ -28,7 +29,7 @@ def load_observations(conn, theater_id: str) -> list[Observation]:
 
     out = []
     for r in rows:
-        emb = tuple(r[12]) if r[12] is not None else None
+        emb = _parse_vector(r[12])
         out.append(Observation(
             obs_id=str(r[0]), theater_id=r[1], source_id=r[2], source_family_id=r[3],
             modality=r[4], obs_type=r[5],
@@ -69,7 +70,7 @@ def write_events(conn, result, theater_id: str, truncate: bool = True) -> int:
                     (event_id, theater_id, event_type, cell_id, resolved_precision_m,
                      occurred_at, status, confidence, confidence_band, n_sources,
                      n_independent_families, flags, created_from_obs, decision_time)
-                VALUES (%s, %s, %s, %s, %s, tstzrange(%s, %s, '[)'), %s, %s, %s, %s, %s, %s, %s, NULL)
+                VALUES (%s, %s, %s, %s, %s, tstzrange(%s, %s, '[)'), %s, %s, %s, %s, %s, %s, %s::uuid[], NULL)
                 ON CONFLICT (event_id) DO NOTHING
                 """,
                 (e.event_id, theater_id, e.event_type, e.cell_id, e.resolved_precision_m,
@@ -90,3 +91,18 @@ def _utc(dt):
     if dt is None:
         return None
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _parse_vector(v) -> Optional[tuple]:
+    """Parse a pgvector embedding into a tuple of floats.
+
+    Without the pgvector psycopg2 adapter registered, a vector(384) column comes back as its
+    TEXT form '[0.1,0.2,...]'. tuple() of that string would split it into characters, so we
+    parse explicitly. Already-sequence inputs (adapter registered, or fixtures) are coerced too.
+    """
+    if v is None:
+        return None
+    if isinstance(v, str):
+        inner = v.strip().lstrip("[").rstrip("]").strip()
+        return tuple(float(x) for x in inner.split(",")) if inner else None
+    return tuple(float(x) for x in v)
