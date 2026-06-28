@@ -1,0 +1,247 @@
+# incidents_v1.yaml — the authored ground-truth spec for the synthetic eval corpus.
+# build_fixtures.py expands this into synthetic_v1.yaml + ground_truth_v1.yaml + verdicts_v1.json.
+#
+# Covers all 8 hard cases the fusion gate must handle (see eval/README.md):
+#   1 same incident via 2 independent families     -> merge, 2 families, High/confirmed
+#   2 same incident echoed 3x by one family        -> merge, 1 family, Rumored + echo-only
+#   3 two distinct incidents ~1km apart same hour  -> must NOT merge (2 events)
+#   4 place-name-only report joins via place_id     -> merge across cells
+#   5 paraphrases (gray band -> frozen same)        -> merge
+#   6 mis-typed but compatible (gray -> frozen same)-> merge
+#   7 stranded singleton                            -> 1-member event, never dropped
+#   8 gray-band ambiguous -> frozen DIFFERENT       -> stay separate
+#
+# All coordinates lie inside the ua_donbas AOI bbox [36.0, 46.8, 39.5, 49.5].
+
+theater_id: ua_donbas
+
+incidents:
+  # 1 — two independent families (ucdp + gdelt), same place+hour -> confirmed High
+  - id: INC-01
+    note: "two independent families merge"
+    expect: {events: 1, band: High, families: 2}
+    observations:
+      - ref: a
+        source_id: ucdp_ged_bulk
+        type: strike
+        lat: 48.1394
+        lon: 37.7490
+        precision_m: 300
+        time: "2024-03-10T08:00:00Z"
+        dur_min: 90
+        text: "Russian artillery struck the Avdiivka coke plant area, three civilians killed and several wounded."
+      - ref: b
+        source_id: gdelt_v2
+        type: strike
+        lat: 48.1396
+        lon: 37.7495
+        precision_m: 500
+        time: "2024-03-10T08:15:00Z"
+        dur_min: 60
+        text: "Shelling reported at the Avdiivka coke plant, casualties among residents in the industrial district."
+
+  # 2 — same incident echoed 3x by one family (gdelt) -> Rumored, echo-only
+  - id: INC-02
+    note: "single-family echo x3"
+    expect: {events: 1, band: Rumored, families: 1, flags_any: [echo-only]}
+    observations:
+      - ref: a
+        source_id: gdelt_v2
+        type: artillery_fire
+        lat: 48.5950
+        lon: 38.0000
+        precision_m: 600
+        time: "2024-03-10T14:00:00Z"
+        dur_min: 60
+        text: "Heavy shelling hit central Bakhmut near the market this afternoon."
+      - ref: b
+        source_id: gdelt_v2
+        type: artillery_fire
+        lat: 48.5951
+        lon: 38.0002
+        precision_m: 600
+        time: "2024-03-10T14:10:00Z"
+        dur_min: 60
+        text: "Heavy shelling hit central Bakhmut near the market area this afternoon."
+      - ref: c
+        source_id: gdelt_v2
+        type: artillery_fire
+        lat: 48.5949
+        lon: 38.0001
+        precision_m: 600
+        time: "2024-03-10T14:20:00Z"
+        dur_min: 60
+        text: "Heavy shelling hit central Bakhmut market this afternoon, fires reported."
+
+  # 3 — two distinct incidents ~1km apart, same hour -> MUST NOT merge
+  - id: INC-03A
+    note: "distinct from INC-03B (must not merge)"
+    expect: {events: 1, band: Rumored, families: 1}
+    must_not_merge_with: [INC-03B]
+    observations:
+      - ref: a
+        source_id: ucdp_ged_bulk
+        type: strike
+        lat: 47.9500
+        lon: 37.5000
+        precision_m: 250
+        time: "2024-03-11T09:00:00Z"
+        dur_min: 30
+        text: "Missile hit the northern checkpoint on the Marinka road, military vehicle destroyed."
+  - id: INC-03B
+    note: "distinct from INC-03A (must not merge)"
+    expect: {events: 1, band: Rumored, families: 1}
+    must_not_merge_with: [INC-03A]
+    observations:
+      - ref: a
+        source_id: ucdp_ged_bulk
+        type: strike
+        lat: 47.9500
+        lon: 37.5135
+        precision_m: 250
+        time: "2024-03-11T09:20:00Z"
+        dur_min: 30
+        text: "Shell struck a residential school building in southern Marinka, roof collapsed."
+
+  # 4 — place-name-only joins via shared place_id across different cells
+  - id: INC-04
+    note: "place_id join across cells"
+    expect: {events: 1, band: High, families: 2}
+    observations:
+      - ref: a
+        source_id: ucdp_ged_bulk
+        type: strike
+        lat: 48.2800
+        lon: 37.1800
+        precision_m: 300
+        place_id: 700004
+        time: "2024-03-12T07:00:00Z"
+        dur_min: 60
+        text: "Pokrovsk railway junction hit by a missile strike, infrastructure damaged."
+      - ref: b
+        source_id: gdelt_v2
+        type: strike
+        lat: 48.2895           # ~1km north -> different cell, same place_id
+        lon: 37.1800
+        precision_m: 2000      # coarse / place-derived
+        place_id: 700004
+        time: "2024-03-12T07:30:00Z"
+        dur_min: 60
+        text: "Strike on Pokrovsk rail hub reported, damage to the junction."
+
+  # 5 — paraphrases of one incident (lands in gray band -> frozen same)
+  - id: INC-05
+    note: "paraphrase pair, gray -> same"
+    expect: {events: 1, band: High, families: 2}
+    observations:
+      - ref: a
+        source_id: ucdp_ged_bulk
+        type: airstrike
+        lat: 48.7200
+        lon: 37.5500
+        precision_m: 400
+        time: "2024-03-13T16:00:00Z"
+        dur_min: 60
+        text: "Guided aerial bomb destroyed a warehouse on the eastern edge of Kramatorsk."
+      - ref: b
+        source_id: acled_api
+        type: airstrike
+        lat: 48.7205
+        lon: 37.5508
+        precision_m: 500
+        time: "2024-03-13T16:20:00Z"
+        dur_min: 60
+        text: "An air-dropped munition leveled a storage depot in Kramatorsk's east industrial belt."
+
+  # 6 — same incident, compatible but different obs_type (gray -> same)
+  - id: INC-06
+    note: "mis-typed but compatible, gray -> same"
+    expect: {events: 1, band: High, families: 2}
+    observations:
+      - ref: a
+        source_id: ucdp_ged_bulk
+        type: strike
+        lat: 47.7800
+        lon: 37.2500
+        precision_m: 350
+        time: "2024-03-14T11:00:00Z"
+        dur_min: 60
+        text: "Vuhledar town center struck, secondary explosions reported near the heating plant."
+      - ref: b
+        source_id: gdelt_v2
+        type: explosion
+        lat: 47.7803
+        lon: 37.2506
+        precision_m: 500
+        time: "2024-03-14T11:25:00Z"
+        dur_min: 60
+        text: "Large blast in central Vuhledar by the heating plant, secondary detonations seen."
+
+  # 7 — stranded singleton (never dropped, Rumored)
+  - id: INC-07
+    note: "stranded singleton"
+    expect: {events: 1, band: Rumored, families: 1, flags_any: [single-source]}
+    observations:
+      - ref: a
+        source_id: gdelt_v2
+        type: troop_move
+        lat: 47.6600
+        lon: 36.2500
+        precision_m: 1500
+        time: "2024-03-15T05:00:00Z"
+        dur_min: 240
+        text: "Column of military vehicles observed moving north through Huliaipole at dawn."
+
+  # 8 — gray-band pair that is genuinely DIFFERENT (frozen verdict different) -> stay separate
+  - id: INC-08A
+    note: "gray -> different from INC-08B"
+    expect: {events: 1, band: Rumored, families: 1}
+    must_not_merge_with: [INC-08B]
+    observations:
+      - ref: a
+        source_id: ucdp_ged_bulk
+        type: convoy
+        lat: 47.4800
+        lon: 36.2500
+        precision_m: 800
+        time: "2024-03-16T10:00:00Z"
+        dur_min: 120
+        text: "Supply convoy moving south past Polohy toward the front, fuel trucks counted."
+  - id: INC-08B
+    note: "gray -> different from INC-08A"
+    expect: {events: 1, band: Rumored, families: 1}
+    must_not_merge_with: [INC-08A]
+    observations:
+      - ref: a
+        source_id: gdelt_v2
+        type: convoy
+        lat: 47.4830
+        lon: 36.2520
+        precision_m: 900
+        time: "2024-03-16T11:30:00Z"
+        dur_min: 120
+        text: "Empty trucks returning north from the Polohy area, separate movement later that morning."
+
+  # 9 — clean 2-family confirmed (distinct hour from INC-04, same town)
+  - id: INC-09
+    note: "clean 2-family confirmed (two text families, same type)"
+    expect: {events: 1, band: High, families: 2}
+    observations:
+      - ref: a
+        source_id: ucdp_ged_bulk
+        type: strike
+        lat: 48.2830
+        lon: 37.1750
+        precision_m: 300
+        time: "2024-03-17T20:00:00Z"
+        dur_min: 60
+        text: "Missile strike hit the Pokrovsk electrical substation, causing a district-wide power outage."
+      - ref: b
+        source_id: acled_api
+        type: strike
+        lat: 48.2832
+        lon: 37.1752
+        precision_m: 400
+        time: "2024-03-17T20:15:00Z"
+        dur_min: 60
+        text: "Reported strike on the Pokrovsk substation knocked out power across the area."

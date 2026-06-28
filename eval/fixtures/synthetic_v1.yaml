@@ -1,0 +1,243 @@
+observations:
+- obs_id: INC-01.a
+  theater_id: ua_donbas
+  source_id: ucdp_ged_bulk
+  source_family_id: ucdp
+  modality: text
+  obs_type: strike
+  occurred_start: '2024-03-10T08:00:00+00:00'
+  occurred_end: '2024-03-10T09:30:00+00:00'
+  cell_id: 37UDP0632
+  geom_precision_m: 300.0
+  place_id: null
+  content_hash: aa6157a6fec24285a9649617a2a1ff6545006ed8d86d9d2a73487a7f119f66e5
+  text: Russian artillery struck the Avdiivka coke plant area, three civilians killed
+    and several wounded.
+- obs_id: INC-01.b
+  theater_id: ua_donbas
+  source_id: gdelt_v2
+  source_family_id: gdelt
+  modality: text
+  obs_type: strike
+  occurred_start: '2024-03-10T08:15:00+00:00'
+  occurred_end: '2024-03-10T09:15:00+00:00'
+  cell_id: 37UDP0632
+  geom_precision_m: 500.0
+  place_id: null
+  content_hash: 6d3f2af0323a9421cc7018c6f27ccd4668c41ece7269c1869823343cb3931f96
+  text: Shelling reported at the Avdiivka coke plant, casualties among residents in
+    the industrial district.
+- obs_id: INC-02.a
+  theater_id: ua_donbas
+  source_id: gdelt_v2
+  source_family_id: gdelt
+  modality: text
+  obs_type: artillery_fire
+  occurred_start: '2024-03-10T14:00:00+00:00'
+  occurred_end: '2024-03-10T15:00:00+00:00'
+  cell_id: 37UDP2682
+  geom_precision_m: 600.0
+  place_id: null
+  content_hash: 773f0d8b6d8695e98d5d9590dffec1b40cbbe1e4e7b4ca436e6b970e9a383a82
+  text: Heavy shelling hit central Bakhmut near the market this afternoon.
+- obs_id: INC-02.b
+  theater_id: ua_donbas
+  source_id: gdelt_v2
+  source_family_id: gdelt
+  modality: text
+  obs_type: artillery_fire
+  occurred_start: '2024-03-10T14:10:00+00:00'
+  occurred_end: '2024-03-10T15:10:00+00:00'
+  cell_id: 37UDP2682
+  geom_precision_m: 600.0
+  place_id: null
+  content_hash: 1c582977807a00d945c6adf5e3e0987de7d001a5757603d8bf0a53cb10411268
+  text: Heavy shelling hit central Bakhmut near the market area this afternoon.
+- obs_id: INC-02.c
+  theater_id: ua_donbas
+  source_id: gdelt_v2
+  source_family_id: gdelt
+  modality: text
+  obs_type: artillery_fire
+  occurred_start: '2024-03-10T14:20:00+00:00'
+  occurred_end: '2024-03-10T15:20:00+00:00'
+  cell_id: 37UDP2682
+  geom_precision_m: 600.0
+  place_id: null
+  content_hash: c38a7103bab555c3941f31df7afb9b72b45c4075119e3228dec38b6be34682d8
+  text: Heavy shelling hit central Bakhmut market this afternoon, fires reported.
+- obs_id: INC-03A.a
+  theater_id: ua_donbas
+  source_id: ucdp_ged_bulk
+  source_family_id: ucdp
+  modality: text
+  obs_type: strike
+  occurred_start: '2024-03-11T09:00:00+00:00'
+  occurred_end: '2024-03-11T09:30:00+00:00'
+  cell_id: 37TCP8711
+  geom_precision_m: 250.0
+  place_id: null
+  content_hash: b3017736796c6aea33c648f934b4f82906630d1c3545e3a04f6e09e391615065
+  text: Missile hit the northern checkpoint on the Marinka road, military vehicle
+    destroyed.
+- obs_id: INC-03B.a
+  theater_id: ua_donbas
+  source_id: ucdp_ged_bulk
+  source_family_id: ucdp
+  modality: text
+  obs_type: strike
+  occurred_start: '2024-03-11T09:20:00+00:00'
+  occurred_end: '2024-03-11T09:50:00+00:00'
+  cell_id: 37TCP8911
+  geom_precision_m: 250.0
+  place_id: null
+  content_hash: 2c0a5cfd8f8096ef693b6f4ecfb1df028969880fbdeed0508c50e0abe35682e2
+  text: Shell struck a residential school building in southern Marinka, roof collapsed.
+- obs_id: INC-04.a
+  theater_id: ua_donbas
+  source_id: ucdp_ged_bulk
+  source_family_id: ucdp
+  modality: text
+  obs_type: strike
+  occurred_start: '2024-03-12T07:00:00+00:00'
+  occurred_end: '2024-03-12T08:00:00+00:00'
+  cell_id: 37UCP6449
+  geom_precision_m: 300.0
+  place_id: 700004
+  content_hash: 588c3e086a9312ead9ea62f7fa85085a4306049708525ac45adb11906a1f22da
+  text: Pokrovsk railway junction hit by a missile strike, infrastructure damaged.
+- obs_id: INC-04.b
+  theater_id: ua_donbas
+  source_id: gdelt_v2
+  source_family_id: gdelt
+  modality: text
+  obs_type: strike
+  occurred_start: '2024-03-12T07:30:00+00:00'
+  occurred_end: '2024-03-12T08:30:00+00:00'
+  cell_id: 37UCP6550
+  geom_precision_m: 2000.0
+  place_id: 700004
+  content_hash: 08917952fa44c6ce1e09abd8c627d1f66790f6546f5b009370553731473838a1
+  text: Strike on Pokrovsk rail hub reported, damage to the junction.
+- obs_id: INC-05.a
+  theater_id: ua_donbas
+  source_id: ucdp_ged_bulk
+  source_family_id: ucdp
+  modality: text
+  obs_type: airstrike
+  occurred_start: '2024-03-13T16:00:00+00:00'
+  occurred_end: '2024-03-13T17:00:00+00:00'
+  cell_id: 37UCP9397
+  geom_precision_m: 400.0
+  place_id: null
+  content_hash: 0c59cce57bfef30d28baa1b776bd77e00d5db89bc7ca669bce96fe00185cb579
+  text: Guided aerial bomb destroyed a warehouse on the eastern edge of Kramatorsk.
+- obs_id: INC-05.b
+  theater_id: ua_donbas
+  source_id: acled_api
+  source_family_id: acled
+  modality: text
+  obs_type: airstrike
+  occurred_start: '2024-03-13T16:20:00+00:00'
+  occurred_end: '2024-03-13T17:20:00+00:00'
+  cell_id: 37UCP9397
+  geom_precision_m: 500.0
+  place_id: null
+  content_hash: 3f1cdd0352fd621910a1e9106d83086009e2e395f787148270f242bc5e36d731
+  text: An air-dropped munition leveled a storage depot in Kramatorsk's east industrial
+    belt.
+- obs_id: INC-06.a
+  theater_id: ua_donbas
+  source_id: ucdp_ged_bulk
+  source_family_id: ucdp
+  modality: text
+  obs_type: strike
+  occurred_start: '2024-03-14T11:00:00+00:00'
+  occurred_end: '2024-03-14T12:00:00+00:00'
+  cell_id: 37TCN6893
+  geom_precision_m: 350.0
+  place_id: null
+  content_hash: cd7ceaf6c5fa53881b0ef480f71b39372129d2151299df6babb87d358d8df9ff
+  text: Vuhledar town center struck, secondary explosions reported near the heating
+    plant.
+- obs_id: INC-06.b
+  theater_id: ua_donbas
+  source_id: gdelt_v2
+  source_family_id: gdelt
+  modality: text
+  obs_type: explosion
+  occurred_start: '2024-03-14T11:25:00+00:00'
+  occurred_end: '2024-03-14T12:25:00+00:00'
+  cell_id: 37TCN6893
+  geom_precision_m: 500.0
+  place_id: null
+  content_hash: 66b05592211895582a81cde5fe558acb37daa0ae4c416d3aa7964919320e3ce5
+  text: Large blast in central Vuhledar by the heating plant, secondary detonations
+    seen.
+- obs_id: INC-07.a
+  theater_id: ua_donbas
+  source_id: gdelt_v2
+  source_family_id: gdelt
+  modality: text
+  obs_type: troop_move
+  occurred_start: '2024-03-15T05:00:00+00:00'
+  occurred_end: '2024-03-15T09:00:00+00:00'
+  cell_id: 37TBN9382
+  geom_precision_m: 1500.0
+  place_id: null
+  content_hash: 3e9f93957e9536a318b43bdfd23008ca3a5c4bf391f80dc9364c053c67fe914f
+  text: Column of military vehicles observed moving north through Huliaipole at dawn.
+- obs_id: INC-08A.a
+  theater_id: ua_donbas
+  source_id: ucdp_ged_bulk
+  source_family_id: ucdp
+  modality: text
+  obs_type: convoy
+  occurred_start: '2024-03-16T10:00:00+00:00'
+  occurred_end: '2024-03-16T12:00:00+00:00'
+  cell_id: 37TBN9262
+  geom_precision_m: 800.0
+  place_id: null
+  content_hash: 2bf76c4d005a0e61487bcd0daee11316442edf4c6cdfd0b33f08a26f762b27a4
+  text: Supply convoy moving south past Polohy toward the front, fuel trucks counted.
+- obs_id: INC-08B.a
+  theater_id: ua_donbas
+  source_id: gdelt_v2
+  source_family_id: gdelt
+  modality: text
+  obs_type: convoy
+  occurred_start: '2024-03-16T11:30:00+00:00'
+  occurred_end: '2024-03-16T13:30:00+00:00'
+  cell_id: 37TBN9262
+  geom_precision_m: 900.0
+  place_id: null
+  content_hash: e42e2bb3dfc801eecd5d12c7cbeedf6f8cb507d273b96566bb594ef5f366e2a1
+  text: Empty trucks returning north from the Polohy area, separate movement later
+    that morning.
+- obs_id: INC-09.a
+  theater_id: ua_donbas
+  source_id: ucdp_ged_bulk
+  source_family_id: ucdp
+  modality: text
+  obs_type: strike
+  occurred_start: '2024-03-17T20:00:00+00:00'
+  occurred_end: '2024-03-17T21:00:00+00:00'
+  cell_id: 37UCP6449
+  geom_precision_m: 300.0
+  place_id: null
+  content_hash: 593073505c033a4eb524d0fb0ba61b29868fe4c420292f194f862c26d0fd72f5
+  text: Missile strike hit the Pokrovsk electrical substation, causing a district-wide
+    power outage.
+- obs_id: INC-09.b
+  theater_id: ua_donbas
+  source_id: acled_api
+  source_family_id: acled
+  modality: text
+  obs_type: strike
+  occurred_start: '2024-03-17T20:15:00+00:00'
+  occurred_end: '2024-03-17T21:15:00+00:00'
+  cell_id: 37UCP6449
+  geom_precision_m: 400.0
+  place_id: null
+  content_hash: fe6308dcd70115d9eb21e65a61cb520f755bbab9de67c3af4c459e2cf158c508
+  text: Reported strike on the Pokrovsk substation knocked out power across the area.

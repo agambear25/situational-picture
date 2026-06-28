@@ -1,0 +1,51 @@
+{
+  "335e5638cf7e1aeb686ca68a476026ee18a8ac8674e375d0ae8cc8a327b6a515": {
+    "confidence": 0.9,
+    "evidence_spans": [],
+    "rationale": "frozen from ground truth (build_fixtures)",
+    "same": true,
+    "tier": "frozen"
+  },
+  "518f3271e2e024cb2c148eea038795af46398883da883601fd92ef341c3e0c02": {
+    "confidence": 0.9,
+    "evidence_spans": [],
+    "rationale": "frozen from ground truth (build_fixtures)",
+    "same": true,
+    "tier": "frozen"
+  },
+  "56b15fc165f7d172590460ec9ddad67c5011e37c63ee3d92d9a00683427f467a": {
+    "confidence": 0.9,
+    "evidence_spans": [],
+    "rationale": "frozen from ground truth (build_fixtures)",
+    "same": true,
+    "tier": "frozen"
+  },
+  "61c37329f7393e45130acc59505dbeba4fdcdfd3fa3fb77a45b439e1b88fff7a": {
+    "confidence": 0.9,
+    "evidence_spans": [],
+    "rationale": "frozen from ground truth (build_fixtures)",
+    "same": true,
+    "tier": "frozen"
+  },
+  "8e7aea6ce837272f6dc55fe2d4fed2c587e1167b00fd1f22f1ba5253e466cbe4": {
+    "confidence": 0.9,
+    "evidence_spans": [],
+    "rationale": "frozen from ground truth (build_fixtures)",
+    "same": false,
+    "tier": "frozen"
+  },
+  "bc982e7bdba30eef159d62d82e23e897258b467616c18e874682861f7778fdba": {
+    "confidence": 0.9,
+    "evidence_spans": [],
+    "rationale": "frozen from ground truth (build_fixtures)",
+    "same": true,
+    "tier": "frozen"
+  },
+  "df3338ebbf8a9ec7395ac32895e12205ec28b03409a1f3af957500e478f55abf": {
+    "confidence": 0.9,
+    "evidence_spans": [],
+    "rationale": "frozen from ground truth (build_fixtures)",
+    "same": true,
+    "tier": "frozen"
+  }
+}

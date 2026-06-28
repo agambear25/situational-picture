@@ -1,0 +1,83 @@
+theater_id: ua_donbas
+n_incidents: 11
+partition:
+  INC-01.a: INC-01
+  INC-01.b: INC-01
+  INC-02.a: INC-02
+  INC-02.b: INC-02
+  INC-02.c: INC-02
+  INC-03A.a: INC-03A
+  INC-03B.a: INC-03B
+  INC-04.a: INC-04
+  INC-04.b: INC-04
+  INC-05.a: INC-05
+  INC-05.b: INC-05
+  INC-06.a: INC-06
+  INC-06.b: INC-06
+  INC-07.a: INC-07
+  INC-08A.a: INC-08A
+  INC-08B.a: INC-08B
+  INC-09.a: INC-09
+  INC-09.b: INC-09
+expectations:
+  INC-01:
+    events: 1
+    band: High
+    families: 2
+  INC-02:
+    events: 1
+    band: Rumored
+    families: 1
+    flags_any:
+    - echo-only
+  INC-03A:
+    events: 1
+    band: Rumored
+    families: 1
+  INC-03B:
+    events: 1
+    band: Rumored
+    families: 1
+  INC-04:
+    events: 1
+    band: High
+    families: 2
+  INC-05:
+    events: 1
+    band: High
+    families: 2
+  INC-06:
+    events: 1
+    band: High
+    families: 2
+  INC-07:
+    events: 1
+    band: Rumored
+    families: 1
+    flags_any:
+    - single-source
+  INC-08A:
+    events: 1
+    band: Rumored
+    families: 1
+  INC-08B:
+    events: 1
+    band: Rumored
+    families: 1
+  INC-09:
+    events: 1
+    band: High
+    families: 2
+must_not_merge_with:
+  INC-03A:
+  - INC-03B
+  INC-03B:
+  - INC-03A
+  INC-08A:
+  - INC-08B
+  INC-08B:
+  - INC-08A
+echo_groups:
+- - INC-02.a
+  - INC-02.b
+  - INC-02.c

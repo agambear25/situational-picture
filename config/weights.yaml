@@ -2,23 +2,38 @@
 # fusion/score.py reads these. Tune by sweeping on the eval fixture corpus.
 
 score_factors:
+  # Pairwise merge score uses a WEIGHTED GEOMETRIC MEAN of the per-factor similarities:
+  #   p = ( s_geo^w_geo · s_time^w_time · s_text^w_text · s_type^w_type ) ^ (1/sum_w)
+  # A geometric mean (not a raw product) avoids the pathology where any single moderate
+  # factor compounds the score to ~0; it keeps "every factor matters" while staying in a
+  # calibrated 0..1 range against the tau_low/tau_high thresholds. A zero factor (e.g. a
+  # huge time gap) still drives p->0, which is the desired "cannot be the same event".
+  #
+  # NOTE: s_indep (same-family echo discount) is intentionally NOT in the merge score.
+  # Whether two reports are the SAME incident is independent of whether they share a source;
+  # echoes are the same event and should merge. Independence is applied ONLY in the
+  # noisy-OR confidence (fusion/propagate.py), so echoes merge but never inflate confidence.
+  w_geo: 1.0
+  w_time: 1.0
+  w_text: 0.6              # text is the weakest signal without embeddings; weight it less
+  w_type: 1.0
+
   # Geo factor: s_geo = exp(-d / sigma), sigma = sigma_k * sqrt(prec_a^2 + prec_b^2)
   sigma_k: 1.5
 
-  # Time factor decay constant (hours)
-  # s_time = exp(-gap_hours / tau_time) when intervals are disjoint
+  # Time factor decay constant (hours): s_time = exp(-gap_hours / tau_time) when disjoint
   tau_time: 6.0
 
-  # Text factor blend: alpha * cosine(emb_a, emb_b) + (1-alpha) * trigram_sim
-  alpha_text: 0.7          # 70% embedding, 30% trigram (embedding wins for semantics)
+  # Text factor blend: alpha * cosine(emb_a, emb_b) + (1-alpha) * lexical_sim
+  # lexical_sim itself blends char-trigram and stopword-filtered token Jaccard.
+  alpha_text: 0.7          # 70% embedding, 30% lexical when embeddings present
 
-  # Same-family independence penalty
-  # When source_family_id matches, multiply s_indep by lambda_family
-  lambda_family: 0.35      # 35% of full weight for same-family pair (echoes discounted heavily)
+  # Reserved: confidence-side family discount (NOT used in the merge score). See note above.
+  lambda_family: 0.35
 
   # Toponym/number bonus to text score (additive, capped at 1.0)
-  toponym_bonus: 0.05
-  number_bonus: 0.03       # matching numbers (coordinates, casualties, etc.)
+  toponym_bonus: 0.30      # shared resolved place_id is a strong same-place signal
+  number_bonus: 0.05       # matching numbers (counts, identifiers)
 
 # Per-source reliability weights (override the source table defaults here)
 # Used as c_f in the noisy-OR calculation
