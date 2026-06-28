@@ -9,11 +9,19 @@ Run:  uvicorn api.main:app --host 127.0.0.1 --port 8000
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from api.deps import get_settings
 from api.routers import admin, cells, events, labeling, layers, review
+
+# The static HTML operator UI (web/) is served by this same app at /ui/, so the front-end and
+# the API share one origin (no CORS) and one command (`uvicorn api.main:app`) runs everything.
+_WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 
 def create_app() -> FastAPI:
@@ -38,6 +46,15 @@ def create_app() -> FastAPI:
     # admin first (owns /healthz); order is cosmetic — paths are absolute.
     for module in (admin, events, cells, layers, review, labeling):
         app.include_router(module.router)
+
+    # Operator UI at /ui/ (html=True serves index.html); "/" redirects there for convenience.
+    if _WEB_DIR.is_dir():
+        app.mount("/ui", StaticFiles(directory=str(_WEB_DIR), html=True), name="ui")
+
+        @app.get("/", include_in_schema=False)
+        def _root():
+            return RedirectResponse(url="/ui/")
+
     return app
 
 

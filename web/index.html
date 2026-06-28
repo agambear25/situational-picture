@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Situational Picture — Ukraine</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◈</span>
+      <div>
+        <h1>Situational Picture</h1>
+        <span class="theater" id="theater">Loading…</span>
+      </div>
+    </div>
+    <p class="honesty">
+      A situational-awareness tool, <strong>not a targeting tool</strong>. Built from public
+      reports that can be incomplete, delayed, or wrong — don't act on a single dot.
+      Locations are rounded to ~1&nbsp;km.
+    </p>
+    <div class="topright">
+      <label class="you">You
+        <input id="analyst" type="text" placeholder="your name" />
+      </label>
+      <span class="status" id="status" title="Backend status">connecting…</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <nav class="tabs" id="tabs">
+        <button data-tab="events" class="active">Events</button>
+        <button data-tab="review">Needs review</button>
+        <button data-tab="add">Add event</button>
+        <button data-tab="health">Health</button>
+      </nav>
+      <div class="panel" id="panel"></div>
+    </aside>
+
+    <section class="mapwrap">
+      <div id="map"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
