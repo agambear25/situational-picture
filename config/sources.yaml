@@ -66,12 +66,32 @@ sources:
     key_env: FIRMS_MAP_KEY
     notes: "1km resolution; older sensor. Corroborates VIIRS independently."
 
-  # --- Imagery (Phase 3) ---
-  sentinel1_sar:
+  # --- Imagery (Phase 3) — acquired via Google Earth Engine (noncommercial, no billing) ---
+  # Independence is keyed on family_id: SAR-amplitude and optical are DISTINCT families (each
+  # independently lifts noisy-OR confidence); SAR classical vs SAR deep are the SAME family.
+  sentinel1_sar_logratio:
     family_id: copernicus_sar
-    label: "Sentinel-1 SAR (Copernicus)"
+    label: "Sentinel-1 SAR amplitude log-ratio change (GEE σ0)"
     modality: imagery
-    reliability_w: 0.9
-    license: "Copernicus Open Access"
-    notes: "Phase 3 only. Not active in MVP."
+    reliability_w: 0.8
+    license: "Copernicus Open Access (via Google Earth Engine, noncommercial)"
+    url: "https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S1_GRD"
+    notes: "Classical deterministic change detector (Phase 3e). The baseline the deep model must beat."
+    phase: 3
+  sentinel2_optical_index:
+    family_id: copernicus_optical     # distinct family from SAR — independent corroboration
+    label: "Sentinel-2 spectral-index change (NDWI flood / NBR burn, GEE)"
+    modality: imagery
+    reliability_w: 0.75
+    license: "Copernicus Open Access (via Google Earth Engine, noncommercial)"
+    url: "https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR_HARMONIZED"
+    notes: "Classical spectral-index detector (Phase 3f); cloud-limited, SAR covers the gaps."
+    phase: 3
+  sentinel1_sar_deepcd:
+    family_id: copernicus_sar         # SAME family as log-ratio — NOT independent corroboration
+    label: "Sentinel-1 SAR deep change model (Phase 3h)"
+    modality: imagery
+    reliability_w: 0.85
+    license: "Copernicus Open Access (via GEE) + HF-hosted weights (pinned digest)"
+    notes: "Deep Siamese/U-Net change model; must beat the classical baseline on the real eval set to ship."
     phase: 3

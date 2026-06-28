@@ -212,6 +212,54 @@ def normalize(
     return obs, None
 
 
+def observation_from_cell(
+    *,
+    cell_id: str,
+    theater_id: str,
+    source_id: str,
+    source_family_id: str,
+    modality: str,
+    obs_type: str,
+    occurred_start: datetime,
+    occurred_end: datetime,
+    text: str = "",
+    self_conf: Optional[float] = None,
+    meta: Optional[dict] = None,
+    taxonomy: Optional[dict] = None,
+    embedder: Optional[Embedder] = None,
+    place_id: Optional[int] = None,
+    geom_precision_m: float = 1000.0,
+) -> Observation:
+    """Build an Observation from an ALREADY-COARSENED detection — the cell_id is authoritative.
+
+    This is the pre-coarsened entry point used by imagery detectors: the cell is fixed by the
+    detection cache, and re-resolving a *centroid* would be unsafe at MGRS/UTM zone edges (a
+    cell's centroid can re-snap into the adjacent zone). So we take the cell_id directly and
+    reuse the SAME content_hash / embedding logic as normalize(); no resolver, no re-derivation.
+    Validates the enums when a taxonomy is supplied (fail loud, never a silent bad type).
+    """
+    if taxonomy is not None:
+        if modality not in set(taxonomy.get("modalities", [])):
+            raise ValueError(f"invalid modality {modality!r}")
+        if obs_type not in set(taxonomy.get("event_types", [])):
+            raise ValueError(f"invalid obs_type {obs_type!r}")
+    text = _normalize_text(text)
+    chash = _content_hash(text, cell_id, occurred_start)
+    embedding = None
+    if embedder is not None and text.strip():
+        vec = embedder.embed(text)
+        if len(vec) != embedder.dim:
+            raise ValueError(f"Embedder returned dim {len(vec)}, expected {embedder.dim} — fail loud")
+        embedding = tuple(vec)
+    return Observation(
+        obs_id=_det_uuid(chash), theater_id=theater_id, source_id=source_id,
+        source_family_id=source_family_id, modality=modality, obs_type=obs_type,
+        occurred_start=occurred_start, occurred_end=occurred_end, cell_id=cell_id,
+        geom_precision_m=geom_precision_m, content_hash=chash, place_id=place_id,
+        text=text, embedding=embedding, self_conf=self_conf, meta=dict(meta or {}),
+    )
+
+
 def ingest_one(
     raw: RawObservation,
     resolver: CellResolver,

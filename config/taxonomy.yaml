@@ -31,6 +31,13 @@ event_types:
   # Administrative
   - checkpoint_established
   - checkpoint_removed
+  # Imagery / CV (Phase 3) — emitted by SAR/optical detectors.
+  # PROVISIONAL seed (PRD v1.1 §17): validated against what 10m can actually resolve in pass 3c.
+  - building_damaged
+  - crater
+  - flood
+  - burn_scar
+  - installation_change
   # Generic
   - other
 
@@ -76,6 +83,35 @@ type_compat:
     naval_engagement: 0.6
     naval_mine: 0.4
     other: 0.2
+  # Imagery damage/change corroborating kinetic text/thermal — the Phase-3 cross-modal lift.
+  # (Symmetric lookup, so e.g. strike↔building_damaged resolves from this row.)
+  building_damaged:
+    strike: 0.7
+    airstrike: 0.7
+    artillery_fire: 0.6
+    explosion: 0.7
+    bridge_damaged: 0.5
+    other: 0.3
+  crater:
+    strike: 0.7
+    artillery_fire: 0.7
+    airstrike: 0.6
+    explosion: 0.7
+    missile_launch: 0.5
+    other: 0.3
+  flood:
+    utility_damaged: 0.3
+    other: 0.2
+  burn_scar:
+    fire: 0.8
+    airstrike: 0.4
+    explosion: 0.4
+    other: 0.3
+  installation_change:
+    troop_move: 0.4
+    armor_move: 0.4
+    convoy: 0.3
+    other: 0.3
   # Everything else vs everything else defaults to 0.1 if not listed above
   _default_cross_type: 0.1
   _default_same_type: 1.0
@@ -100,6 +136,13 @@ landcover_plausibility:
   convoy:
     implausible_codes: [80]
     penalty_if_implausible: 0.3
+  # Imagery damage is implausible over open water (likely a false positive there).
+  building_damaged:
+    implausible_codes: [80]        # water
+    penalty_if_implausible: 0.5
+  crater:
+    implausible_codes: [80]
+    penalty_if_implausible: 0.6
 
 # Per-source type mappings (ingest adapters normalize to these)
 source_type_maps:
@@ -125,4 +168,10 @@ block_params:
   armor_move:   {radius_m: 8000,  window_hours: 12}
   convoy:       {radius_m: 5000,  window_hours: 8}
   naval_transit: {radius_m: 25000, window_hours: 12}
+  # Imagery detections (Phase 3): damage persists, acquisition windows are wide.
+  building_damaged:     {radius_m: 1500, window_hours: 24}
+  crater:               {radius_m: 1500, window_hours: 24}
+  flood:                {radius_m: 5000, window_hours: 72}
+  burn_scar:            {radius_m: 3000, window_hours: 48}
+  installation_change:  {radius_m: 3000, window_hours: 72}
   _default:     {radius_m: 5000,  window_hours: 12}
