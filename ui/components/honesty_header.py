@@ -37,8 +37,10 @@ _FEEDS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "feeds.yam
 _PHASE_GATED = 3
 
 _BANNER_TEXT = (
-    "**Analytical OSINT — incomplete, lagged, and deception-prone.** "
-    "Decision-support, **NOT** targeting. All geometry is 1km-cell only."
+    "**This is a situational-awareness tool, not a targeting tool.** "
+    "It's built from public reports that can be incomplete, delayed, or wrong. "
+    "Use it to understand what's happening — not to act on a single dot. "
+    "Locations are rounded to ~1km for safety."
 )
 
 
@@ -90,7 +92,7 @@ def render(client: Any = None) -> None:  # noqa: ARG001 — `client` is for sign
         # Config absent/unreadable: the warning above already did the safety-critical work.
         return
 
-    st.caption("Feed tempo — each source answers a different clock:")
+    st.caption("How fresh each source is — they update on different clocks:")
 
     # One column per feed so the tempos sit side by side; the operator can scan "which clock"
     # at a glance instead of reading a paragraph. st.columns tolerates many narrow columns.
@@ -99,14 +101,13 @@ def render(client: Any = None) -> None:  # noqa: ARG001 — `client` is for sign
         gated = feed.get("phase") == _PHASE_GATED
         with column:
             if gated:
-                # Phase-3: greyed + "(P3)" tag so it is visibly present-but-not-contributing.
-                # Markdown grey keeps it readable without implying it is a live tempo.
+                # Phase-3: greyed + "(not on yet)" so it is visibly present-but-not-contributing.
                 st.markdown(
-                    f"<span style='color:#94a3b8'>{feed['label']} (P3)<br>"
+                    f"<span style='color:#94a3b8'>{feed['label']} (not on yet)<br>"
                     f"{feed['next_update_display']}</span>",
                     unsafe_allow_html=True,
                 )
             else:
-                # Live feeds: label + "next update" cadence as a quiet caption pair.
+                # Live feeds: label + "updates every…" as a quiet caption pair.
                 st.caption(f"**{feed['label']}**")
-                st.caption(f"next: {feed['next_update_display']}")
+                st.caption(f"updates {feed['next_update_display']}")

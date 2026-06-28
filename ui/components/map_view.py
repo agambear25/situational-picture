@@ -80,16 +80,24 @@ def _tooltip_fields(event: dict) -> dict:
     }
 
 
+# Plain-English meaning for each confidence colour, shown in the legend.
+_BAND_MEANING = {
+    "High": "confirmed by several independent sources",
+    "Medium": "partly confirmed",
+    "Low": "weak signal",
+    "Rumored": "single source / not yet confirmed",
+}
+
+
 def _legend() -> None:
     """Small color->band legend so the map is readable without a separate key."""
-    st.caption("Confidence band")
+    st.caption("What the colours mean — how well-confirmed each event is:")
     for band, rgb in BAND_COLORS.items():
         swatch = f"rgb({rgb[0]},{rgb[1]},{rgb[2]})"
-        note = " (single-source / echo-only also shown here)" if band == "Rumored" else ""
         st.markdown(
             f"<span style='display:inline-block;width:12px;height:12px;background:{swatch};"
             f"border-radius:2px;margin-right:6px;vertical-align:middle;'></span>"
-            f"<span style='vertical-align:middle;'>{band}{note}</span>",
+            f"<span style='vertical-align:middle;'>{band} — {_BAND_MEANING.get(band, '')}</span>",
             unsafe_allow_html=True,
         )
 
@@ -100,12 +108,12 @@ def render(client, events=None) -> None:
 
     # ---- sidebar controls (band filter + substrate toggle) ----
     band_choice = st.sidebar.selectbox(
-        "Confidence band", ["All", "High", "Medium", "Low", "Rumored"], index=0,
-        help="Filter the dots by reported confidence band.",
+        "Show events that are…", ["All", "High", "Medium", "Low", "Rumored"], index=0,
+        help="Filter the map by how well-confirmed events are.",
     )
     substrate_choice = st.sidebar.multiselect(
-        "Substrate layers", list(_SUBSTRATE_LAYERS),
-        help="Overlay context layers (admin, rivers, etc.) fetched from the read-only API.",
+        "Background map layers", list(_SUBSTRATE_LAYERS),
+        help="Add context to the map — borders, rivers, roads, land type.",
     )
 
     # ---- load events (only when app.py didn't hand us a list) ----
@@ -122,7 +130,7 @@ def render(client, events=None) -> None:
         events = [e for e in events if e.get("confidence_band") == band_choice]
 
     if not events:
-        st.info("No coverage / no events for this theater.")
+        st.info("No events to show for this area yet.")
         return
 
     # ---- build event layers (polygon where we have a cell ring, scatter as fallback) ----
@@ -173,10 +181,10 @@ def render(client, events=None) -> None:
     tooltip = {
         "html": (
             "<b>{event_type}</b><br/>"
-            "Band: {confidence_band}<br/>"
-            "Independent families: {n_independent_families}<br/>"
-            "Flags: {flags}<br/>"
-            "Cell: {cell_id}"
+            "Confidence: {confidence_band}<br/>"
+            "Independent sources: {n_independent_families}<br/>"
+            "Notes: {flags}<br/>"
+            "Area: {cell_id}"
         ),
         "style": {"backgroundColor": "#0f172a", "color": "white"},
     }

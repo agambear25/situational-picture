@@ -50,10 +50,12 @@ def _histogram(scores: list[float], bins: int) -> dict[str, int]:
 
 
 def render(client):
-    st.subheader("Threshold tuner")
-    st.caption(
-        "Previews from the frozen pair-score snapshot — re-bands a fixed score in Python, no model "
-        "call. Gray pairs still need LLM/human adjudication; this only proposes the cut points."
+    st.subheader("Match settings (advanced)")
+    st.info(
+        "Advanced — you can skip this. It controls how eager the system is to treat two reports "
+        "as the *same* event. Looser settings merge more (risking wrong merges); stricter settings "
+        "merge less (leaving more for a person to decide). Changes here only *preview* — nothing "
+        "goes live until you re-run the check."
     )
 
     # The API may be down or the snapshot empty — be resilient (Streamlit convention).
@@ -65,7 +67,7 @@ def render(client):
 
     pairs = snap.get("pairs", [])
     if not pairs:
-        st.info("No pair scores in the snapshot yet. Run `python -m eval.harness` to populate it.")
+        st.info("Nothing to preview yet. Run the consistency check first to generate the data.")
         return
 
     # Defaults come from the snapshot's own thresholds so the sliders open at the current config.
@@ -73,12 +75,13 @@ def render(client):
     default_low = float(defaults.get("tau_low", 0.38))
     default_high = float(defaults.get("tau_high", 0.82))
 
-    tau_low = st.slider("tau_low (≤ → auto-reject)", 0.0, 1.0, default_low, 0.01)
-    tau_high = st.slider("tau_high (≥ → auto-merge)", 0.0, 1.0, default_high, 0.01)
+    tau_low = st.slider("Below this similarity → treat as DIFFERENT events", 0.0, 1.0, default_low, 0.01)
+    tau_high = st.slider("Above this similarity → treat as the SAME event", 0.0, 1.0, default_high, 0.01)
+    st.caption("Anything in between is sent to a person to decide.")
     # Enforce the ordering invariant: a gray band only exists when tau_low <= tau_high. If the
     # analyst crosses them, collapse to a single cut so the preview stays meaningful.
     if tau_low > tau_high:
-        st.warning("tau_low exceeded tau_high — clamping tau_low down to keep a valid band.")
+        st.warning("The two settings crossed over — adjusting so they still make sense.")
         tau_low = tau_high
 
     # Recompute bands over the frozen scores. Skip pairs with no usable p.
@@ -117,21 +120,22 @@ def render(client):
     recall = same_and_true / total_true if total_true else 0.0
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("gray fraction", f"{gray_fraction:.1%}", help=f"{n_gray} / {n_scored} pairs")
-    c2.metric("auto-merge precision", f"{precision:.1%}", help=f"{same_and_true} / {n_same} merged")
-    c3.metric("auto-merge recall", f"{recall:.1%}", help=f"{same_and_true} / {total_true} true-same")
-    # No-silent-drop is a structural guarantee of the event-sourcing replay, not a tunable metric —
-    # every observation is materialized or explicitly dropped, never lost. Show it as constant truth.
-    c4.metric("no_silent_drop", "guaranteed by design")
+    c1.metric("Sent to a person", f"{gray_fraction:.0%}", help=f"{n_gray} of {n_scored} pairs")
+    c2.metric("Auto-merges that were right", f"{precision:.0%}",
+              help=f"{same_and_true} of {n_same} merged were actually the same event")
+    c3.metric("Real same-events caught", f"{recall:.0%}",
+              help=f"{same_and_true} of {total_true} truly-same pairs were merged")
+    # No-silent-drop is a structural guarantee of the event-sourcing replay, not a tunable metric.
+    c4.metric("Nothing lost", "always")
 
     # Distribution of p with the two cut points called out in text (st.bar_chart can't draw vlines).
-    st.caption(f"Score distribution — tau_low = {tau_low:.2f}, tau_high = {tau_high:.2f}")
+    st.caption("How similar the report pairs are to each other (the two sliders are your cut-offs):")
     st.bar_chart(_histogram(scores, _HIST_BINS))
 
     # Commit step: write the proposed thresholds back into config/thresholds.yaml, preserving every
     # other key (confidence_bands, llm gammas, staleness). yaml is imported lazily — only needed on
     # the rare write path, keeps the component import dependency-light for tests.
-    if st.button("Apply thresholds"):
+    if st.button("Save these settings"):
         import yaml  # lazy: only the write path needs it
         try:
             with _THRESHOLDS_PATH.open("r") as fh:
@@ -146,4 +150,4 @@ def render(client):
             st.error(f"Could not write thresholds: {exc}")
             return
         # Preview math is NOT the harness math — force a real re-run before anyone trusts these.
-        st.warning("Thresholds written. Re-run 'python -m eval.harness' before trusting the new values.")
+        st.warning("Saved. Run the consistency check (System health tab) before relying on the new settings.")

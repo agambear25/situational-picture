@@ -27,7 +27,8 @@ from ui.components import (
 )
 
 # Tab order is part of the analyst's mental model (read -> review -> tune -> audit); keep it stable.
-_TABS = ["Map", "Event", "Verify Queue", "Label Studio", "Threshold Tuner", "Replay/Insights"]
+# Plain-English labels for non-technical operators; the variable names below keep the dev meaning.
+_TABS = ["Map", "Find an event", "Needs review", "Add events", "Match settings", "System health"]
 
 
 def _build_client() -> CopApiClient:
@@ -42,41 +43,47 @@ def _build_client() -> CopApiClient:
 def _render_replay_insights(client: CopApiClient, analyst: str) -> None:
     # Replay proves the event store is append-only and bit-reproducible (the integrity guarantee).
     # It mutates nothing, but it is expensive, so gate it behind an explicit button press.
-    st.subheader("Replay integrity check")
+    st.subheader("Consistency check")
     st.caption(
-        "Re-materializes events from the observation log and compares the digest. "
-        "bit_identical=True means no silent drift; dropped_obs should always be empty."
+        "Rebuilds all events from the original reports and checks you get the exact same result. "
+        "If it matches, nothing has been quietly lost or changed."
     )
-    if st.button("Run replay check", key="replay_run"):
+    if st.button("Run consistency check", key="replay_run"):
         result = client.admin_replay()
         identical = result.get("bit_identical")
+        dropped = result.get("dropped_obs", [])
         # Surface the headline as a status, not raw JSON, so a green/red read is instant.
         if identical:
-            st.success(f"bit_identical = True · dropped_obs = {result.get('dropped_obs', [])}")
+            st.success("✓ Consistent — every report is accounted for, nothing was lost.")
         else:
-            st.error(f"bit_identical = False · dropped_obs = {result.get('dropped_obs', [])}")
-        st.json(result)
+            st.error(f"⚠ Something doesn't match. Reports unaccounted for: {dropped}")
+        with st.expander("Technical detail"):
+            st.json(result)
 
     st.divider()
 
     # The rejection ledger is the "no-drop" promise made visible: nothing is discarded silently,
     # every filtered observation has a recorded reason. Show the summary as the audit surface.
-    st.subheader("Rejection ledger (no-drop)")
+    st.subheader("Skipped reports")
+    st.caption(
+        "Reports the system set aside (e.g. outside the map area, or exact duplicates). "
+        "Nothing is thrown away silently — every skipped report is logged here with a reason."
+    )
     rejections = client.get_rejections()
     summary = rejections.get("summary", {"total": 0, "by_reason": {}})
-    st.metric("Total rejected (with recorded reason)", summary.get("total", 0))
+    st.metric("Reports set aside (with a reason)", summary.get("total", 0))
     by_reason = summary.get("by_reason", {})
     if by_reason:
         st.bar_chart(by_reason)
     else:
-        st.caption("No rejections recorded for this theater.")
+        st.caption("No reports have been set aside for this area.")
 
     st.divider()
 
     # Honest framing: the assessment/insights layer is not built yet. Say so rather than fake it.
     st.info(
-        "Insights & assessment layer arrives in Phase 4. This tab currently exposes the integrity "
-        "guarantees (replay + rejection ledger) that the later analytics will build on."
+        "Automatic analysis (trends, alerts, summaries) is coming later. For now this screen just "
+        "shows that the data is intact: nothing lost, everything accounted for."
     )
 
 
@@ -87,7 +94,9 @@ def main() -> None:
 
     # Analyst name attributes every append-only annotation (review/label/verdict). Default keeps
     # the MVP usable without auth; in a real deployment this would come from the session identity.
-    analyst = st.sidebar.text_input("Analyst", value="analyst")
+    analyst = st.sidebar.text_input(
+        "Your name", value="analyst",
+        help="Saved alongside anything you confirm or add, so there's a record of who did what.")
 
     # Persistent across every tab: the honesty header states what this tool is and is NOT (it is
     # decision-support, not targeting; geometry is 1km-cell only). It must always be in view.
@@ -104,11 +113,14 @@ def main() -> None:
         with tab_event:
             # No global event picker exists yet, so the Event tab takes a free-text id. We only
             # render the panel once an id is supplied to avoid a spurious 404 on first load.
-            event_id = st.text_input("Event ID", key="event_id_input").strip()
+            event_id = st.text_input(
+                "Event ID", key="event_id_input",
+                help="Paste an event's ID (you can copy it from the Map or Needs-review screens) "
+                     "to see all the reports behind it.").strip()
             if event_id:
                 event_panel.render(client, event_id, analyst)
             else:
-                st.caption("Enter an event ID to inspect its evidence trail.")
+                st.caption("Paste an event ID above to see where it came from and the reports behind it.")
 
         with tab_verify:
             verify_queue.render(client, analyst)

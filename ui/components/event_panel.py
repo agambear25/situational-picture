@@ -36,13 +36,13 @@ _PROMINENT_FLAGS = ("verification-needed", "echo-only", "single-source")
 # Context keys we lift into the inherited-context table, in display order. Pulled from a constant
 # so the field set is one obvious thing to edit rather than scattered through render().
 _CONTEXT_FIELDS: tuple[tuple[str, str], ...] = (
-    ("label", "Cell label"),
-    ("admin_l1", "Admin L1"),
-    ("admin_l2", "Admin L2"),
-    ("admin_l3", "Admin L3"),
-    ("landcover_label", "Land cover"),
-    ("builtup_pct", "Built-up %"),
-    ("has_bridge", "Has bridge"),
+    ("label", "Area name"),
+    ("admin_l1", "Region"),
+    ("admin_l2", "District"),
+    ("admin_l3", "Locality"),
+    ("landcover_label", "Land type"),
+    ("builtup_pct", "Built-up area %"),
+    ("has_bridge", "Bridge nearby"),
     ("nearest_road_class", "Nearest road"),
 )
 
@@ -80,30 +80,37 @@ def render(client, event_id, analyst: str = "analyst") -> None:
         f"&nbsp;·&nbsp; {band or 'Unknown'} &nbsp;·&nbsp; `{ev.get('status', 'unknown')}`",
         unsafe_allow_html=True,
     )
-    st.caption(f"event_id `{ev.get('event_id', event_id)}` · cell `{ev.get('cell_id', '—')}`")
+    st.caption(f"Event ID: `{ev.get('event_id', event_id)}` · Area: `{ev.get('cell_id', '—')}`")
 
     # --- metrics row ---------------------------------------------------------
     flags = ev.get("flags") or []
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Sources", ev.get("n_sources", 0))
-    c2.metric("Independent families", ev.get("n_independent_families", 0))
+    c1.metric("Reports", ev.get("n_sources", 0))
+    c2.metric("Independent sources", ev.get("n_independent_families", 0))
     conf = ev.get("confidence")
-    c3.metric("Confidence", f"{conf:.2f}" if isinstance(conf, (int, float)) else "—")
-    c4.metric("Flags", len(flags))
+    c3.metric("Confidence", f"{conf:.0%}" if isinstance(conf, (int, float)) else "—")
+    c4.metric("Warnings", len(flags))
 
-    # Prominent flags first — a single-source or echo-only event is a "do not act yet" signal.
+    # Plain-English meaning for the flags an operator must not over-read.
+    _FLAG_PLAIN = {
+        "single-source": "Only one source — not independently confirmed.",
+        "echo-only": "Looks like the same report repeated, not separate confirmation.",
+        "verification-needed": "Needs a person to check before relying on it.",
+    }
     for flag in flags:
         if flag in _PROMINENT_FLAGS:
-            st.warning(f"⚑ {flag}")
+            st.warning(f"⚑ {_FLAG_PLAIN.get(flag, flag)}")
     other_flags = [f for f in flags if f not in _PROMINENT_FLAGS]
     if other_flags:
-        st.caption("Other flags: " + ", ".join(other_flags))
+        st.caption("Other notes: " + ", ".join(other_flags))
 
     # --- evidence trail ------------------------------------------------------
-    st.markdown("#### Evidence trail")
+    st.markdown("#### Where this came from")
+    st.caption("Every report behind this event, oldest first. The ‘source type’ is what matters "
+               "for confidence — two different source types is stronger than one repeated.")
     observations = sorted(ev.get("observations") or [], key=_obs_sort_key)
     if not observations:
-        st.caption("No observations attached to this event.")
+        st.caption("No reports attached to this event.")
     for obs in observations:
         # Lead with source *family* and time so the analyst reads provenance, not raw source ids;
         # the family is what independence is judged on (echo vs. genuinely separate reporting).
@@ -122,10 +129,10 @@ def render(client, event_id, analyst: str = "analyst") -> None:
             st.markdown(f"> {excerpt}")
 
     # --- inherited context ---------------------------------------------------
-    st.markdown("#### Inherited context")
+    st.markdown("#### About this location")
     context = ev.get("context") or {}
     if not context:
-        st.caption("No cell context available.")
+        st.caption("No background info available for this area.")
     else:
         # Small two-column table; only show fields the cell actually has so empties don't clutter.
         rows = [
@@ -136,29 +143,31 @@ def render(client, event_id, analyst: str = "analyst") -> None:
         if rows:
             st.table(rows)
         else:
-            st.caption("No cell context available.")
+            st.caption("No background info available for this area.")
 
     # --- review actions (append-only) ---------------------------------------
-    st.markdown("#### Review")
+    st.markdown("#### Your decision")
+    st.caption("**Keep** = it's one real event · **Split** = it's actually several events · "
+               "**Remove** = it's not a real event. Your choice is saved as a note.")
     reason = st.text_input(
-        "Reason / rationale", key=f"review_reason_{event_id}",
-        help="Recorded with the review. Required context for split; advisable for reject.",
+        "Note (saved with your decision)", key=f"review_reason_{event_id}",
+        help="Recommended for split and remove, so there's a record of why.",
     )
 
     def _submit(action: str) -> None:
         # Single path for all three actions so error handling stays in one place. Reviews are
         # append-only; the API records who/what/why and never mutates the event in place.
         try:
-            result = client.post_review(event_id, action, reason, analyst)
+            client.post_review(event_id, action, reason, analyst)
         except Exception as exc:
-            st.error(f"Review failed: {exc}")
+            st.error(f"Couldn't save your decision: {exc}")
             return
-        st.success(f"{action.capitalize()} recorded (review_id {result.get('review_id', '?')}).")
+        st.success("Saved.")
 
     b1, b2, b3 = st.columns(3)
-    if b1.button("Confirm event", key=f"confirm_{event_id}"):
+    if b1.button("Keep", key=f"confirm_{event_id}"):
         _submit("confirm")
-    if b2.button("Split this event", key=f"split_{event_id}"):
+    if b2.button("Split", key=f"split_{event_id}"):
         _submit("split")
-    if b3.button("Reject event", key=f"reject_{event_id}"):
+    if b3.button("Remove", key=f"reject_{event_id}"):
         _submit("reject")
