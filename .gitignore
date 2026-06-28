@@ -10,6 +10,7 @@ venv/
 
 # Local data cache (can be gigabytes — never commit rasters/PBF)
 ~/.osint_cop/
+.tile_cache/
 
 # Secrets
 .secrets/

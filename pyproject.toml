@@ -37,6 +37,7 @@ full = [
     "streamlit>=1.35",
     "pydeck>=0.9",
     "nats-py>=2.6",
+    "earthengine-api>=0.1.390",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
 ]
