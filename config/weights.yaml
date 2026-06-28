@@ -1,0 +1,31 @@
+# weights.yaml — fusion score factor parameters and source reliability weights
+# fusion/score.py reads these. Tune by sweeping on the eval fixture corpus.
+
+score_factors:
+  # Geo factor: s_geo = exp(-d / sigma), sigma = sigma_k * sqrt(prec_a^2 + prec_b^2)
+  sigma_k: 1.5
+
+  # Time factor decay constant (hours)
+  # s_time = exp(-gap_hours / tau_time) when intervals are disjoint
+  tau_time: 6.0
+
+  # Text factor blend: alpha * cosine(emb_a, emb_b) + (1-alpha) * trigram_sim
+  alpha_text: 0.7          # 70% embedding, 30% trigram (embedding wins for semantics)
+
+  # Same-family independence penalty
+  # When source_family_id matches, multiply s_indep by lambda_family
+  lambda_family: 0.35      # 35% of full weight for same-family pair (echoes discounted heavily)
+
+  # Toponym/number bonus to text score (additive, capped at 1.0)
+  toponym_bonus: 0.05
+  number_bonus: 0.03       # matching numbers (coordinates, casualties, etc.)
+
+# Per-source reliability weights (override the source table defaults here)
+# Used as c_f in the noisy-OR calculation
+source_reliability:
+  ucdp_ged:       1.0      # authoritative post-hoc; high reliability
+  firms_viirs:    0.85     # satellite thermal; good spatial precision
+  firms_modis:    0.75     # older sensor; coarser
+  acled:          0.9      # gated; high quality when available
+  gdelt:          0.6      # high volume, lower geocoding quality
+  _default:       0.7

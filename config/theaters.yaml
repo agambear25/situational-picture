@@ -1,0 +1,43 @@
+# theaters.yaml — canonical AOI/theater registry
+# config/grid.yaml and all geo/ loaders read bbox FROM HERE; never duplicate it.
+
+theaters:
+  ua_donbas:
+    label: "Ukraine — Donbas + Zaporizhzhia"
+    # bbox: [west, south, east, north] EPSG:4326
+    # Covers: Donetsk, Luhansk, Zaporizhzhia oblasts + buffer
+    bbox: [36.0, 46.8, 39.5, 49.5]
+    # Admin source + level for local_seq parent subdivision
+    admin_source: geoboundaries          # alt: ua_codifier, gadm (avoid GADM: license + coarser)
+    admin_level: hromada                 # hromada (Lvl 3/4 in UA hierarchy) → meaningful 'Avdiivka-16'
+    admin_url: "https://www.geoboundaries.org/api/current/gbOpen/UKR/ADM3/"
+    # AOI buffer for tile downloads (km)
+    aoi_buffer_km: 20
+    # Date windows
+    data_start: "2022-02-24"             # full-scale invasion start
+    data_end: null                       # null = rolling present
+    # Control overlay cadence (stub for MVP — own-derived only, never ISW/DeepStateMap)
+    control_cadence_hours: 24
+    active: true
+
+  delhi:
+    label: "Delhi NCT + Yamuna floodplain"
+    bbox: [76.8, 28.3, 77.5, 29.0]
+    admin_source: geoboundaries
+    admin_level: district
+    aoi_buffer_km: 10
+    data_start: "2023-01-01"
+    data_end: null
+    control_cadence_hours: null          # no control overlay for civil theater
+    active: false                        # Phase 5 only
+
+  hormuz:
+    label: "Strait of Hormuz"
+    bbox: [55.5, 25.8, 59.0, 27.5]
+    admin_source: geoboundaries
+    admin_level: province
+    aoi_buffer_km: 50
+    data_start: "2024-01-01"
+    data_end: null
+    control_cadence_hours: 12
+    active: false                        # Phase 5 only

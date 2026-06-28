@@ -1,0 +1,43 @@
+# thresholds.yaml — fusion score thresholds and confidence band cutoffs
+# Tune these by sweeping the PR curve on eval/fixtures/synthetic_v1.yaml.
+# All values are starting recommendations; confirm after first harness run.
+
+fusion:
+  # Gray-band boundaries for pairwise score p ∈ [0,1]
+  # p >= tau_high → auto-merge (no LLM)
+  # p <= tau_low  → auto-reject (no LLM)
+  # tau_low < p < tau_high → gray band → LLM adjudication
+  tau_high: 0.82
+  tau_low: 0.38
+  # Target: gray band ≤ ~15% of candidate pairs
+
+confidence_bands:
+  # noisy-OR confidence C ∈ [0,1] → band label
+  # C = 1 - prod(1 - c_f) over independent source families
+  High:
+    min_confidence: 0.85
+    min_independent_families: 2
+  Medium:
+    min_confidence: 0.65
+    max_confidence: 0.849
+    min_independent_families: 1
+  Low:
+    min_confidence: 0.45
+    max_confidence: 0.649
+    min_independent_families: 1
+  Rumored:
+    # Single source OR confidence < 0.45
+    max_confidence: 0.449
+    # single_source always Rumored regardless of confidence
+    single_source_always_rumored: true
+
+llm:
+  # Confidence below which gate (3B) escalates to adjudicator (7B)
+  gate_gamma: 0.72
+  # Confidence below which adjudicator (7B) escalates to terminal (14B)
+  escalation_gamma: 0.68
+
+event_staleness:
+  # After no new corroborating obs for this many hours, status → 'stale'
+  # Per-type overrides in ttls.yaml
+  default_hours: 48

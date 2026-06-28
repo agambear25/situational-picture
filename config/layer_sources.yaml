@@ -1,0 +1,104 @@
+# layer_sources.yaml — per-substrate-layer download registry
+# All entries are free / open data. PAID sources are marked and OFF by default.
+# 'core' flag = required for Phase-0 gate; Phase3 = deferred.
+
+layers:
+  admin:
+    label: "Admin boundaries (hromada level)"
+    source: geoboundaries
+    url_template: "https://www.geoboundaries.org/api/current/gbOpen/UKR/ADM3/"
+    format: geojson
+    license: CC-BY-4.0
+    attribution: "geoBoundaries (William & Mary geoLab)"
+    as_of_policy: "download date stamped in geo_feature.as_of"
+    core: true
+    paid: false
+
+  gazetteer:
+    label: "GeoNames place names + multilingual aliases"
+    source: geonames
+    # MANDATORY: UA/RU/transliterated/historical aliases prevent Drop from name fragmentation
+    files:
+      - url: "http://download.geonames.org/export/dump/UA.zip"
+        description: "Ukraine place names"
+      - url: "http://download.geonames.org/export/dump/alternateNamesV2.zip"
+        description: "Multilingual aliases (UA/RU/en/translit/hist)"
+    format: tsv
+    license: CC-BY-4.0
+    attribution: "GeoNames (geonames.org)"
+    as_of_policy: "weekly snapshot, stamp download date"
+    core: true
+    paid: false
+
+  landcover:
+    label: "ESA WorldCover 10m land cover"
+    source: esa_worldcover
+    url_template: "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_{tile}_Map.tif"
+    # Tiles covering ua_donbas AOI: N45E034, N45E037, N48E034, N48E037
+    tiles:
+      ua_donbas: ["N45E034", "N45E037", "N48E034", "N48E037"]
+    format: geotiff
+    resolution_m: 10
+    license: CC-BY-4.0
+    attribution: "ESA WorldCover 2021 v2.0"
+    as_of_policy: "2021 baseline; treat as static for MVP"
+    core: true
+    paid: false
+
+  dem:
+    label: "Copernicus DEM GLO-30 (30m)"
+    source: copernicus_dem
+    url_template: "https://opentopography.s3.sdsc.edu/minio/raster/COP90/COP90_hh/{tile}.tif"
+    # NOTE: sequence DEM rasterio pass so it does NOT co-run with a resident large Ollama model (RAM rule)
+    format: geotiff
+    resolution_m: 30
+    license: "Copernicus DEM License (free, attribution required)"
+    attribution: "© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA"
+    as_of_policy: "static baseline; suitable for terrain only"
+    core: true
+    paid: false
+
+  osm_ukraine:
+    label: "OpenStreetMap Ukraine extract (buildings, transport, hydro)"
+    source: geofabrik
+    url: "https://download.geofabrik.de/europe/ukraine-latest.osm.pbf"
+    format: pbf
+    license: ODbL-1.0
+    attribution: "© OpenStreetMap contributors"
+    as_of_policy: "weekly; stamp download date"
+    core: true
+    paid: false
+    note: "Clip to AOI bbox on load. Provides: building footprints, highway/rail, water/rivers."
+
+  hydrorivers:
+    label: "HydroRIVERS (Phase-0 hydro)"
+    source: hydrosheds
+    url: "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_eu_shp.zip"
+    format: shapefile
+    license: CC-BY-4.0
+    attribution: "HydroSHEDS / WWF"
+    as_of_policy: "static v1.0"
+    core: true
+    paid: false
+
+  # --- Phase 3 (not downloaded in MVP) ---
+  sentinel_sar:
+    label: "Sentinel-1 SAR (Copernicus)"
+    source: copernicus_dataspace
+    url: "https://dataspace.copernicus.eu/"
+    format: GRD
+    license: "Copernicus Open Access (free with registration)"
+    as_of_policy: "rolling 6-day repeat"
+    core: false
+    paid: false
+    phase: 3
+    note: "Registration required. Not ingested in MVP."
+
+  soil:
+    label: "ISRIC SoilGrids 250m"
+    source: isric
+    url: "https://files.isric.org/soilgrids/former/2017-03-10/data/"
+    format: geotiff
+    license: CC-BY-4.0
+    core: false
+    phase: 3

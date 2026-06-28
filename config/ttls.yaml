@@ -1,0 +1,42 @@
+# ttls.yaml — per-event-type staleness TTL (hours)
+# After no new corroborating observation for TTL hours, event status → 'stale'.
+# Also drives the UI freshness decay opacity.
+
+ttls:
+  # Kinetic (fast-moving; stale quickly)
+  strike: 12
+  airstrike: 8
+  artillery_fire: 8
+  missile_launch: 6
+  explosion: 6
+  fire: 4
+
+  # Maneuver (medium pace)
+  troop_move: 48
+  armor_move: 36
+  convoy: 24
+  crossing: 24
+
+  # Maritime
+  naval_transit: 24
+  naval_engagement: 12
+  naval_mine: 72          # mines persist
+
+  # Infrastructure (slower to change)
+  bridge_damaged: 168     # 1 week
+  bridge_destroyed: 720   # 30 days
+  road_blocked: 48
+  utility_damaged: 72
+
+  # Humanitarian
+  civilian_displacement: 72
+  humanitarian_delivery: 24
+  hospital_event: 72
+
+  # Administrative
+  checkpoint_established: 48
+  checkpoint_removed: 24
+
+  # Default fallback
+  other: 48
+  _default: 48

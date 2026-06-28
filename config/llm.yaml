@@ -1,0 +1,63 @@
+# llm.yaml — LLM tiering configuration (all local Ollama, Claude OFF)
+# Every version string here is a cache key component.
+# Bump model_version/prompt_version/schema_version → invalidates only affected verdicts.
+
+llm:
+  # --- Gate tier (fast first pass) ---
+  gate_model: "qwen2.5:3b-instruct-q4_K_M"
+  gate_model_version: "qwen2.5-3b-v1"
+  # Escalate to adjudicator if gate confidence < gate_gamma (see thresholds.yaml)
+
+  # --- Adjudicator tier (workhorse) ---
+  adjudicator_model: "qwen2.5:7b-instruct-q4_K_M"
+  adjudicator_model_version: "qwen2.5-7b-v1"
+  # Escalate to terminal if adjudicator confidence < escalation_gamma (see thresholds.yaml)
+
+  # --- Terminal escalation tier (local, not Claude) ---
+  # Per your decision: local 14B replaces Claude as the terminal tier.
+  # 14B is not Claude-grade but fails safe: uncertain → keep-separate + flag, never silent merge.
+  escalation_model: "qwen2.5:14b-instruct-q4_K_M"
+  escalation_model_version: "qwen2.5-14b-v1"
+
+  # --- Claude (PAID, OFF by default) ---
+  # Only set claude_enabled: true post-MVP with explicit user instruction.
+  # Claude Code will flag and stop before using this path unless explicitly enabled.
+  claude_enabled: false
+  claude_model: "claude-sonnet-4-6"   # kept inert; not called when claude_enabled=false
+
+  # --- Prompt and schema versions (feed cache key) ---
+  prompt_version: "v1"
+  schema_version: "v1"
+
+  # --- Inference settings ---
+  temperature: 0         # deterministic output required for replay
+  seed: 0                # deterministic seed
+  max_tokens: 256        # constrained JSON verdict is short
+
+  # --- High-salience event types (escalate to terminal tier) ---
+  # These are the pairs that matter most — worth paying the 14B throughput cost.
+  high_salience_types:
+    - bridge_damaged
+    - bridge_destroyed
+    - utility_damaged
+    - missile_launch
+    - naval_engagement
+    - airstrike
+
+  # --- Circuit breaker ---
+  circuit_breaker:
+    failure_threshold: 5       # consecutive failures to open circuit
+    recovery_timeout_s: 60     # seconds in OPEN before trying HALF_OPEN
+    # On open circuit: keep separate + flag 'verification-needed' (NOT merge)
+    # This is the PRD §ADJUDICATE rule — Cross-check #4 fix.
+    fallback: keep_separate_and_flag
+
+  # --- Timeouts ---
+  gate_timeout_s: 8
+  adjudicator_timeout_s: 20
+  escalation_timeout_s: 60
+
+  # --- Ollama server ---
+  ollama_base_url: "http://localhost:11434"
+  # RAM rule: keep 3B resident; swap 7B↔14B on demand (never co-resident with rasterio/HNSW build)
+  resident_model: "qwen2.5:3b-instruct-q4_K_M"

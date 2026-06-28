@@ -1,0 +1,25 @@
+# grid.yaml — grid precision policy and local_seq config
+# AOI/bbox lives in theaters.yaml; this file references it by theater_id only.
+
+grid:
+  precision_km: 1                        # locked: 1km MGRS always
+  # Which admin level is the local_seq parent subdivision
+  # Must match theaters.yaml admin_level for the active theater
+  local_seq_admin_level: hromada         # 'Avdiivka-16' — meaningful at this granularity
+
+  # Geo precision bands (used by resolver to classify a CellResolution)
+  precision_bands:
+    precise_m: 500                       # ≤500m → GeoPrecision.PRECISE (fits within one cell)
+    coarse_m: 5000                       # ≤5km → COARSE (snapped to nearest cell)
+    # > coarse_m → PLACE_ONLY (name-resolved, no coordinate)
+
+  # Resolver behaviour
+  resolver:
+    place_only_fallback: true            # place-name-only obs resolve to cell WITHOUT dropping
+    admin_centroid_fallback: true        # obs with only admin-level geom → admin centroid cell
+    drop_on_no_resolve: false            # never drop — goes to obs_rejection instead
+
+  # Builder behaviour
+  builder:
+    skip_water_cells: false              # keep water/sea cells (AIS, naval observations)
+    idempotent_upsert: true             # ON CONFLICT DO UPDATE

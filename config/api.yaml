@@ -1,0 +1,17 @@
+# api.yaml — FastAPI bind config
+
+api:
+  host: "127.0.0.1"          # localhost only; never 0.0.0.0 for MVP
+  port: 8000
+  default_theater: "ua_donbas"
+  # Coarsening enforcement — never disabled
+  enforce_coarsening: true
+  # CORS: Streamlit on same host
+  cors_origins:
+    - "http://localhost:8501"
+    - "http://127.0.0.1:8501"
+  # Pagination
+  default_page_size: 100
+  max_page_size: 1000
+  # Read-only: no write endpoints except POST /review (append-only annotation)
+  read_only_mode: true

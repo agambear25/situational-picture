@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+*.env
+
+# Local data cache (can be gigabytes — never commit rasters/PBF)
+~/.osint_cop/
+
+# Secrets
+.secrets/
+config/secrets.yaml
+
+# IDE
+.vscode/
+.idea/
+
+# Test artifacts
+.pytest_cache/
+*.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb

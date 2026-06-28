@@ -1,0 +1,77 @@
+# sources.yaml — source_id → family_id + reliability weight
+# The independence judgments that noisy-OR depends on.
+# Multiple sensors/APIs in the same family do NOT independently corroborate each other.
+
+sources:
+  # --- Text feeds ---
+  ucdp_ged_bulk:
+    family_id: ucdp
+    label: "UCDP Georeferenced Event Database (bulk)"
+    modality: text
+    reliability_w: 1.0
+    license: CC-BY-4.0
+    url: "https://ucdp.uu.se/downloads/"
+    notes: "Open, no login. Authoritative post-hoc; latency ~weeks. MVP text feed."
+
+  gdelt_v2:
+    family_id: gdelt
+    label: "GDELT Event Database v2"
+    modality: text
+    reliability_w: 0.6
+    license: Public Domain
+    url: "https://www.gdeltproject.org/"
+    notes: "Near-real-time, no login, high volume. Lower geocoding quality. Fallback."
+
+  acled_api:
+    family_id: acled
+    label: "ACLED API"
+    modality: text
+    reliability_w: 0.9
+    license: "ACLED Terms (requires registration)"
+    url: "https://developer.acleddata.com/"
+    notes: "Gated — registration required. OFF by default. Better geocoding than GDELT."
+    paid: false
+    requires_key: true
+
+  # --- Thermal / satellite ---
+  firms_viirs_snpp:
+    family_id: nasa_firms         # VIIRS SNPP + NOAA-20 are same sensor family
+    label: "NASA FIRMS VIIRS SNPP active fire"
+    modality: thermal
+    reliability_w: 0.85
+    license: "Public Domain (NASA)"
+    url: "https://firms.modaps.eosdis.nasa.gov/"
+    notes: "Requires free FIRMS_MAP_KEY. 375m resolution."
+    requires_key: true
+    key_env: FIRMS_MAP_KEY
+
+  firms_viirs_noaa20:
+    family_id: nasa_firms         # same family as SNPP — both from FIRMS/VIIRS
+    label: "NASA FIRMS VIIRS NOAA-20 active fire"
+    modality: thermal
+    reliability_w: 0.85
+    license: "Public Domain (NASA)"
+    url: "https://firms.modaps.eosdis.nasa.gov/"
+    requires_key: true
+    key_env: FIRMS_MAP_KEY
+
+  firms_modis:
+    family_id: nasa_modis         # different sensor → different family
+    label: "NASA FIRMS MODIS active fire"
+    modality: thermal
+    reliability_w: 0.75
+    license: "Public Domain (NASA)"
+    url: "https://firms.modaps.eosdis.nasa.gov/"
+    requires_key: true
+    key_env: FIRMS_MAP_KEY
+    notes: "1km resolution; older sensor. Corroborates VIIRS independently."
+
+  # --- Imagery (Phase 3) ---
+  sentinel1_sar:
+    family_id: copernicus_sar
+    label: "Sentinel-1 SAR (Copernicus)"
+    modality: imagery
+    reliability_w: 0.9
+    license: "Copernicus Open Access"
+    notes: "Phase 3 only. Not active in MVP."
+    phase: 3

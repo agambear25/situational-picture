@@ -1,0 +1,128 @@
+# taxonomy.yaml — event_type enum, modality enum, type compatibility matrix,
+# land-cover plausibility rules, per-source type maps.
+# All fusion/block.py and fusion/score.py logic reads this; no magic numbers in code.
+
+event_types:
+  # Kinetic
+  - strike
+  - airstrike
+  - artillery_fire
+  - missile_launch
+  - explosion
+  - fire                   # thermal / FIRMS
+  # Maneuver
+  - troop_move
+  - armor_move
+  - convoy
+  - crossing               # river/bridge crossing
+  # Maritime
+  - naval_transit
+  - naval_engagement
+  - naval_mine
+  # Infrastructure
+  - bridge_damaged
+  - bridge_destroyed
+  - road_blocked
+  - utility_damaged        # power, water, comms
+  # Humanitarian
+  - civilian_displacement
+  - humanitarian_delivery
+  - hospital_event
+  # Administrative
+  - checkpoint_established
+  - checkpoint_removed
+  # Generic
+  - other
+
+modalities:
+  - text
+  - thermal
+  - imagery
+  - ais
+  - adsb
+  - seismic
+
+# Type compatibility matrix: 1.0 = same type, 0.0 = incompatible (never block)
+# Symmetric; only non-obvious pairs listed; all unspecified same-type pairs = 1.0
+type_compat:
+  strike:
+    airstrike: 0.8
+    artillery_fire: 0.7
+    explosion: 0.7
+    fire: 0.4
+    missile_launch: 0.6
+    other: 0.3
+  airstrike:
+    missile_launch: 0.6
+    explosion: 0.6
+    fire: 0.3
+    other: 0.3
+  artillery_fire:
+    explosion: 0.8
+    fire: 0.3
+    other: 0.3
+  explosion:
+    fire: 0.5
+    other: 0.3
+  fire:
+    utility_damaged: 0.4
+    other: 0.2
+  troop_move:
+    armor_move: 0.7
+    convoy: 0.6
+    crossing: 0.5
+    other: 0.3
+  naval_transit:
+    naval_engagement: 0.6
+    naval_mine: 0.4
+    other: 0.2
+  # Everything else vs everything else defaults to 0.1 if not listed above
+  _default_cross_type: 0.1
+  _default_same_type: 1.0
+
+# Land-cover plausibility gate in fusion/score.py
+# If event_type is NOT plausible for the cell's dominant_landcover, apply penalty multiplier
+landcover_plausibility:
+  # ESA WorldCover codes: 10=trees, 20=shrub, 30=grassland, 40=cropland,
+  #                       50=built-up, 60=bare, 70=snow, 80=water, 90=wetland, 95=mangrove
+  naval_transit:
+    required_codes: [80]           # must be water
+    penalty_if_not: 0.2
+  naval_engagement:
+    required_codes: [80]
+    penalty_if_not: 0.2
+  naval_mine:
+    required_codes: [80]
+    penalty_if_not: 0.2
+  troop_move:
+    implausible_codes: [80]        # improbable in water cell
+    penalty_if_implausible: 0.3
+  convoy:
+    implausible_codes: [80]
+    penalty_if_implausible: 0.3
+
+# Per-source type mappings (ingest adapters normalize to these)
+source_type_maps:
+  ucdp_ged:
+    # UCDP event_type_name → our obs_type
+    "Armed Conflict (Government)": strike
+    "Armed Conflict (Non-State)": strike
+    "One-sided violence": other
+    "_default": other
+  firms_viirs:
+    "_all": fire               # all FIRMS detections → fire obs_type
+  firms_modis:
+    "_all": fire
+
+# Blocking parameters per type (fed to fusion/block.py)
+block_params:
+  strike:       {radius_m: 2000,  window_hours: 6}
+  airstrike:    {radius_m: 3000,  window_hours: 4}
+  artillery_fire: {radius_m: 2000, window_hours: 4}
+  explosion:    {radius_m: 1500,  window_hours: 3}
+  fire:         {radius_m: 1000,  window_hours: 2}
+  troop_move:   {radius_m: 10000, window_hours: 24}
+  armor_move:   {radius_m: 8000,  window_hours: 12}
+  convoy:       {radius_m: 5000,  window_hours: 8}
+  naval_transit: {radius_m: 25000, window_hours: 12}
+  _default:     {radius_m: 5000,  window_hours: 12}

@@ -1,0 +1,34 @@
+# runtime.yaml — the GATE flag + infrastructure config
+# live_feeds_enabled MUST be false until eval.harness exits 0.
+
+runtime:
+  # THE GATE: flip to true ONLY after `python -m eval.harness` passes.
+  # ingest/run.py refuses live adapters unless this is true.
+  live_feeds_enabled: false
+
+  # Active theater for single-theater MVP
+  theater_id: "ua_donbas"
+
+  # Database DSN (read from env in production; fallback here for local dev)
+  # Override with DB_DSN env var.
+  db_dsn: "postgresql://localhost:5432/osint_cop"
+  # API read-only role DSN
+  db_dsn_api: "postgresql://cop_api:changeme@localhost:5432/osint_cop"
+
+  # NATS JetStream
+  bus_enabled: true
+  nats_servers: ["nats://localhost:4222"]
+  nats_stream: "cop_events"
+
+  # Ollama health check on startup
+  ollama_url: "http://localhost:11434"
+  require_ollama: true    # startup fails if Ollama not reachable (set false for eval-only runs)
+
+  # Logging
+  log_level: "INFO"
+  log_json: false         # true for production/parsing
+
+  # Cost/non-local guard
+  # Claude Code halts and flags if any step would incur a charge or need non-local infra.
+  local_only: true
+  paid_apis_enabled: false

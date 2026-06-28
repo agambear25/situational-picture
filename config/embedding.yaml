@@ -1,0 +1,22 @@
+# embedding.yaml — pinned embedding model configuration
+# This file is part of the adjudication cache key.
+# NEVER change model_name or digest without regenerating eval/fixtures/verdicts_v1.json.
+
+embedding:
+  model_name: "all-MiniLM-L6-v2"
+  # Dimension locked at 384 — matches log.observation.embedding vector(384)
+  # Cross-check #1: supersedes any 768-d / nomic-embed-text reference
+  dim: 384
+  # Ollama model tag (for local inference path)
+  ollama_tag: "nomic-embed-text"   # NOTE: use all-MiniLM via sentence-transformers, not Ollama
+  # Preferred inference: sentence-transformers (local, no Ollama needed for embedding)
+  backend: sentence_transformers
+  # Pinned model digest — set this after first `from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); print(m._modules['0'].auto_model.config._name_or_path)`
+  # FILL THIS IN on first run: python -c "from sentence_transformers import SentenceTransformer; import hashlib, json; m = SentenceTransformer('all-MiniLM-L6-v2'); cfg = m[0].auto_model.config.to_dict(); print(hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest())"
+  model_digest: "FILL_IN_AFTER_FIRST_RUN"
+  # Cache key component: bump this string when digest changes (invalidates affected verdicts)
+  embedding_version: "minilm-l6-v2-384d-v1"
+  # Batch size for embedding
+  batch_size: 64
+  # Fail loud if embedding dim != expected
+  enforce_dim: true

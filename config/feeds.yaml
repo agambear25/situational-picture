@@ -1,0 +1,40 @@
+# feeds.yaml — feed cadences for the UI multi-tempo "as-of / next update" strip
+
+feeds:
+  ucdp_ged_bulk:
+    label: "UCDP GED"
+    cadence: weekly
+    typical_lag_days: 7           # authoritative but lagged
+    next_update_display: "~weekly"
+
+  firms_viirs_snpp:
+    label: "FIRMS VIIRS SNPP"
+    cadence: near_realtime
+    typical_lag_hours: 3
+    next_update_display: "~3h"
+
+  firms_viirs_noaa20:
+    label: "FIRMS VIIRS NOAA-20"
+    cadence: near_realtime
+    typical_lag_hours: 3
+    next_update_display: "~3h"
+
+  firms_modis:
+    label: "FIRMS MODIS"
+    cadence: daily
+    typical_lag_hours: 12
+    next_update_display: "~12h"
+
+  gdelt_v2:
+    label: "GDELT"
+    cadence: near_realtime
+    typical_lag_minutes: 15
+    next_update_display: "~15min"
+
+  # Phase 3
+  sentinel1_sar:
+    label: "Sentinel-1 SAR"
+    cadence: repeat
+    typical_lag_days: 6
+    next_update_display: "~6 days"
+    phase: 3

@@ -1,0 +1,18 @@
+{
+  "type": "Feature",
+  "properties": {
+    "theater_id": "ua_donbas",
+    "label": "Ukraine — Donbas + Zaporizhzhia AOI",
+    "bbox": [36.0, 46.8, 39.5, 49.5]
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[
+      [36.0, 46.8],
+      [36.0, 49.5],
+      [39.5, 49.5],
+      [39.5, 46.8],
+      [36.0, 46.8]
+    ]]
+  }
+}

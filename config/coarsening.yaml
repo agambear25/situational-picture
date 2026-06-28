@@ -1,0 +1,34 @@
+# coarsening.yaml — cell-only geometry policy at the API boundary
+# api/coarsen.py enforces these rules. CoarseningViolation raised on any precise coord.
+# This is the analytical-not-targeting structural enforcement.
+
+coarsening:
+  # Default: all geometries returned as cell centroid or cell polygon
+  default_mode: cell_centroid
+
+  per_modality:
+    text: cell_centroid
+    thermal: cell_centroid
+    imagery: cell_centroid
+    ais: cell_centroid
+    adsb: cell_centroid
+    seismic: cell_centroid
+
+  per_entity_kind:
+    formation: cell_polygon        # broader area
+    site: cell_centroid
+    vessel: cell_centroid
+    vehicle: cell_centroid
+    unit: cell_polygon
+    installation: cell_polygon     # installations: cell-polygon ONLY, never precise coords
+
+  # Observed military sites: cell granularity only
+  # modelled as assessments with confidence+staleness, never authoritative coords.
+  military_site_mode: cell_polygon
+
+  # API returns cell_id always; geometry is derived from it
+  include_cell_id: true
+  include_precise_geom: false      # NEVER expose precise coords through API
+
+  # No 'person' entity kind exists; assert_no_person check in api/coarsen.py
+  assert_no_person: true
