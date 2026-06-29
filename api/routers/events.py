@@ -29,17 +29,23 @@ def list_events(
     status: str | None = Query(default=None),
     band: str | None = Query(default=None),
     flag: str | None = Query(default=None),
+    since: str | None = Query(default=None),
+    until: str | None = Query(default=None),
     limit: int = Query(default=200),
     offset: int = Query(default=0),
     conn=Depends(get_conn),
 ) -> dict:
-    """Paged, filtered list of fused events for a theater (cell-only geometry)."""
+    """Paged, filtered list of fused events for a theater (cell-only geometry).
+
+    since/until (ISO timestamps) filter by event start time — the chronology scrubber passes
+    `until` for the cumulative 'as of date T' view.
+    """
     settings = get_settings()
     # theater_id is optional on the wire; resolve the configured default when omitted.
     theater_id = theater_id or settings["default_theater"]
     # Cap the page size so a caller cannot demand an unbounded scan.
     limit = min(limit, settings["max_page_size"])
-    rows = queries.list_events(conn, theater_id, status, band, flag, limit, offset)
+    rows = queries.list_events(conn, theater_id, status, band, flag, limit, offset, since, until)
     return {
         "events": [coarsen_event(e) for e in rows],
         "count": queries.event_count(conn, theater_id),

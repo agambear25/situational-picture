@@ -19,8 +19,13 @@ from typing import Optional
 def list_events(
     conn, theater_id: str, status: Optional[str] = None, band: Optional[str] = None,
     flag: Optional[str] = None, limit: int = 100, offset: int = 0,
+    since: Optional[str] = None, until: Optional[str] = None,
 ) -> list[dict]:
-    """Events for a theater, newest-first, with optional status/band/flag filters."""
+    """Events for a theater, newest-first, with optional status/band/flag/time filters.
+
+    `since`/`until` (ISO timestamps) filter on the event's start time — `until` gives the
+    cumulative 'everything known as of date T' view the chronology scrubber uses.
+    """
     where = ["theater_id = %s"]
     params: list = [theater_id]
     if status:
@@ -29,6 +34,10 @@ def list_events(
         where.append("confidence_band = %s"); params.append(band)
     if flag:
         where.append("%s = ANY(flags)"); params.append(flag)
+    if since:
+        where.append("lower(occurred_at) >= %s"); params.append(since)
+    if until:
+        where.append("lower(occurred_at) <= %s"); params.append(until)
     params.extend([limit, offset])
     sql = f"""
         SELECT event_id, theater_id, event_type, cell_id, resolved_precision_m,

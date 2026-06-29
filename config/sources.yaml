@@ -95,3 +95,12 @@ sources:
     license: "Copernicus Open Access (via GEE) + HF-hosted weights (pinned digest)"
     notes: "Deep Siamese/U-Net change model; must beat the classical baseline on the real eval set to ship."
     phase: 3
+
+  unosat:
+    family_id: unosat                 # authoritative human-analyst damage assessment (own family)
+    label: "UNOSAT / UNITAR satellite damage assessment"
+    modality: imagery
+    reliability_w: 1.0
+    license: "UNOSAT / UNITAR — free for non-commercial / humanitarian use (CC-BY-3.0-IGO)"
+    url: "https://unosat.org/products/"
+    notes: "Building-level war-damage points (2022 onwards). Used as 3e eval ground truth AND ingested as a dated historical damage layer for the 2022-onwards chronology."

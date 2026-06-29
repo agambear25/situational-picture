@@ -9,6 +9,8 @@
 const API = "";                       // same origin (served by the API at /ui/)
 let THEATER = "ua_donbas";
 let map, eventLayer, selectedLayer;
+const T_MIN = Date.UTC(2022, 1, 24);  // 2022-02-24, the full-scale invasion — chronology start
+let UNTIL = null;                      // null = live (everything); else "YYYY-MM-DD" cumulative cut-off
 
 // Plain confidence labels + colours mirror the styles.css --band-* tokens (single source of truth).
 const BANDS = {
@@ -71,9 +73,19 @@ function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp
 /* ---- map ---- */
 function initMap() {
   map = L.map("map", { zoomControl: true, attributionControl: true }).setView([48.2, 37.8], 7);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 19,
-  }).addTo(map);
+  // Keyless basemaps. Satellite is the default (asked for — you can see what's actually there);
+  // a switcher (top-right) flips to terrain or a clean dark map.
+  const satellite = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { attribution: "&copy; Esri, Maxar, Earthstar Geographics", maxZoom: 19 });
+  const terrain = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+    { attribution: "&copy; Esri", maxZoom: 19 });
+  const dark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    { attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 19 });
+  satellite.addTo(map);
+  L.control.layers({ "Satellite": satellite, "Terrain": terrain, "Dark": dark }, null,
+    { position: "topright", collapsed: true }).addTo(map);
   eventLayer = L.layerGroup().addTo(map);
   renderLegend();
 }
@@ -135,21 +147,42 @@ function setTab(tab) {
 /* ---- Events list ---- */
 async function renderEvents() {
   const panel = document.getElementById("panel");
+  const days = Math.floor((Date.now() - T_MIN) / 86400000);
+  const cur = UNTIL ? Math.floor((Date.parse(UNTIL) - T_MIN) / 86400000) : days;
   panel.innerHTML = `
+    <div class="scrubber">
+      <div class="scrub-top">
+        <span class="scrub-label" id="scrubLabel">${UNTIL ? "As of " + UNTIL : "Live — everything so far"}</span>
+        <button class="scrub-reset" id="scrubReset"${UNTIL ? "" : " disabled"}>Live</button>
+      </div>
+      <input type="range" id="timeScrub" min="0" max="${days}" value="${cur}" step="1"
+        aria-label="Show events up to this date" />
+      <div class="scrub-ends"><span>Feb 2022</span><span>today</span></div>
+    </div>
     <label class="field"><span>Show events that are…</span>
       <select id="bandFilter">
-        <option value="">All</option><option>High</option><option>Medium</option>
+        <option value="">All confidence</option><option>High</option><option>Medium</option>
         <option>Low</option><option>Rumored</option>
       </select></label>
     <div id="eventList" class="empty">Loading…</div>`;
   document.getElementById("bandFilter").onchange = loadEvents;
+  const scrub = document.getElementById("timeScrub");
+  scrub.oninput = () => {
+    const v = +scrub.value;
+    UNTIL = v >= days ? null : new Date(T_MIN + v * 86400000).toISOString().slice(0, 10);
+    document.getElementById("scrubLabel").textContent = UNTIL ? "As of " + UNTIL : "Live — everything so far";
+    document.getElementById("scrubReset").disabled = !UNTIL;
+    clearTimeout(renderEvents._t); renderEvents._t = setTimeout(loadEvents, 140);
+  };
+  document.getElementById("scrubReset").onclick = () => { UNTIL = null; renderEvents(); };
   await loadEvents();
 }
 async function loadEvents() {
   const band = document.getElementById("bandFilter")?.value || "";
   let data;
+  const q = `${band ? `&band=${band}` : ""}${UNTIL ? `&until=${UNTIL}T23:59:59Z` : ""}`;
   try {
-    data = await api(`/events?theater_id=${THEATER}&limit=500${band ? `&band=${band}` : ""}`);
+    data = await api(`/events?theater_id=${THEATER}&limit=500${q}`);
   } catch (e) { document.getElementById("eventList").innerHTML = `<div class="empty">Couldn't load events: ${esc(e.message)}</div>`; return; }
   const events = (data && data.events) || [];
   drawEvents(events);
@@ -212,6 +245,7 @@ async function selectEvent(id) {
     <div class="muted" style="text-transform:capitalize;margin-bottom:4px">${esc(ev.event_type)}${ev.place && ev.place.distance_km != null ? ` · ~${ev.place.distance_km} km from ${esc(ev.place.name)}` : ""}</div>
     <div class="code">area ${esc(ev.cell_id)} · id ${esc(ev.event_id)}</div>
     ${warns}
+    <div class="cellhist"><span class="backlink" id="cellHist">▤ See this area's full history over time ›</span></div>
     <div class="why" data-band="${band}"><p><b>Why “${BANDS[band].plain}”?</b> ${BANDS[band].meaning}.</p></div>
     <div class="metrics">
       <div class="metric"><div class="v">${esc(ev.n_sources ?? 0)}</div><div class="k">reports</div></div>
@@ -232,7 +266,34 @@ async function selectEvent(id) {
       <button class="btn danger" data-act="reject">Remove</button>
     </div>`;
   document.getElementById("back").onclick = renderEvents;
+  document.getElementById("cellHist").onclick = () => renderCellHistory(ev.cell_id, placeLabel(ev));
   panel.querySelectorAll("[data-act]").forEach((b) => (b.onclick = () => review(id, b.dataset.act)));
+}
+
+/* ---- Per-cell history (the chronology of one 1km area) ---- */
+async function renderCellHistory(cellId, label) {
+  const panel = document.getElementById("panel");
+  panel.innerHTML = `<div class="empty">Loading…</div>`;
+  let c;
+  try { c = await api(`/cells/${encodeURIComponent(cellId)}`); }
+  catch (e) { panel.innerHTML = `<div class="empty">Couldn't load: ${esc(e.message)}</div>`; return; }
+  const events = (((c && c.events) || []).slice())
+    .sort((a, b) => String(a.occurred_start || "").localeCompare(String(b.occurred_start || "")));
+  const timeline = events.map((e) => {
+    const band = bandOf(e);
+    return `<div class="tl-item" data-band="${band}">
+      <div class="tl-date">${esc(String(e.occurred_start || "").slice(0, 10) || "—")}</div>
+      <div class="tl-body"><span class="pill ${BANDS[band].cls}">${BANDS[band].plain}</span>
+        <span class="tl-type">${esc(e.event_type)}</span></div>
+    </div>`;
+  }).join("") || `<div class="muted">No history recorded for this area.</div>`;
+  panel.innerHTML = `
+    <span class="backlink" id="back">‹ Back to events</span>
+    <h2 style="margin:.2em 0">${esc(label || ("area " + cellId))}</h2>
+    <div class="code">area ${esc(cellId)} · ${events.length} event(s) over time</div>
+    <div class="hint">Everything recorded in this 1&nbsp;km area, oldest first — the area's full history.</div>
+    <div class="timeline">${timeline}</div>`;
+  document.getElementById("back").onclick = renderEvents;
 }
 async function review(id, action) {
   const reason = document.getElementById("rvReason")?.value || "";
