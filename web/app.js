@@ -8,9 +8,16 @@
 
 const API = "";                       // same origin (served by the API at /ui/)
 let THEATER = "ua_donbas";
-let map, eventLayer, selectedLayer;
+let map, eventLayer, selectedLayer, controlLayer;
 const T_MIN = Date.UTC(2022, 1, 24);  // 2022-02-24, the full-scale invasion — chronology start
 let UNTIL = null;                      // null = live (everything); else "YYYY-MM-DD" cumulative cut-off
+// Coarse, own-curated control overlay (license-clean — authored from public knowledge, never ISW/DSM).
+const CONTROL = {
+  RU: { color: "#c0392b", label: "Russian-held" },
+  UA: { color: "#2e6fd0", label: "Ukrainian-held" },
+  contested: { color: "#b8862f", label: "Contested" },
+};
+let SHOW_CONTROL = true;
 
 // Plain confidence labels + colours mirror the styles.css --band-* tokens (single source of truth).
 const BANDS = {
@@ -86,14 +93,33 @@ function initMap() {
   satellite.addTo(map);
   L.control.layers({ "Satellite": satellite, "Terrain": terrain, "Dark": dark }, null,
     { position: "topright", collapsed: true }).addTo(map);
+  controlLayer = L.layerGroup().addTo(map);   // control tint sits UNDER the events
   eventLayer = L.layerGroup().addTo(map);
   renderLegend();
 }
+async function loadControl(date) {
+  if (!controlLayer) return;
+  controlLayer.clearLayers();
+  if (!SHOW_CONTROL) return;
+  let data;
+  try { data = await api(`/control${date ? `?date=${date}` : ""}`); } catch (e) { return; }
+  for (const s of (data.settlements || [])) {
+    const c = CONTROL[s.side];
+    if (!c) continue;
+    L.circle([s.lat, s.lon], { radius: 11000, color: c.color, weight: 1, opacity: 0.5,
+      fillColor: c.color, fillOpacity: 0.16, interactive: false })
+      .bindTooltip(`${esc(s.name)} — ${c.label}`, { sticky: true }).addTo(controlLayer);
+  }
+}
 function renderLegend() {
   document.getElementById("legend").innerHTML =
-    `<h4>What the colours mean</h4>` +
+    `<h4>How confident we are</h4>` +
     Object.entries(BANDS).map(([b, d]) =>
-      `<div class="row"><span class="dot" style="background:${d.color}"></span><b>${d.plain}</b> — ${d.meaning}</div>`).join("");
+      `<div class="row"><span class="dot" style="background:${d.color}"></span><b>${d.plain}</b> — ${d.meaning}</div>`).join("") +
+    `<h4 style="margin-top:10px">Who controlled the area</h4>` +
+    Object.entries(CONTROL).map(([k, c]) =>
+      `<div class="row"><span class="dot" style="background:${c.color};opacity:.65"></span>${c.label}</div>`).join("") +
+    `<div class="legend-caveat">Control is coarse &amp; illustrative — city-level, approximate dates, authored from public knowledge. Not a live frontline.</div>`;
 }
 function drawEvents(events) {
   eventLayer.clearLayers();
@@ -158,6 +184,8 @@ async function renderEvents() {
       <input type="range" id="timeScrub" min="0" max="${days}" value="${cur}" step="1"
         aria-label="Show events up to this date" />
       <div class="scrub-ends"><span>Feb 2022</span><span>today</span></div>
+      <label class="ctl-toggle"><input type="checkbox" id="ctlToggle"${SHOW_CONTROL ? " checked" : ""} />
+        Tint the map by who controlled each area</label>
     </div>
     <label class="field"><span>Show events that are…</span>
       <select id="bandFilter">
@@ -175,6 +203,7 @@ async function renderEvents() {
     clearTimeout(renderEvents._t); renderEvents._t = setTimeout(loadEvents, 140);
   };
   document.getElementById("scrubReset").onclick = () => { UNTIL = null; renderEvents(); };
+  document.getElementById("ctlToggle").onchange = (e) => { SHOW_CONTROL = e.target.checked; loadControl(UNTIL); };
   await loadEvents();
 }
 async function loadEvents() {
@@ -186,6 +215,7 @@ async function loadEvents() {
   } catch (e) { document.getElementById("eventList").innerHTML = `<div class="empty">Couldn't load events: ${esc(e.message)}</div>`; return; }
   const events = (data && data.events) || [];
   drawEvents(events);
+  loadControl(UNTIL);              // keep the control tint in sync with the scrubbed date
   if (!band) setSummary(events);   // the top strip is a global overview — only refresh it when unfiltered
   const list = document.getElementById("eventList");
   if (!events.length) { list.className = "empty"; list.textContent = "No events to show for this area yet."; return; }

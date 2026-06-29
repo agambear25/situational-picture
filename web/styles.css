@@ -525,6 +525,11 @@ button.btn.danger:hover { border-color: var(--danger); color: var(--danger); }
 .scrub-reset:disabled { background: var(--panel-3); color: var(--muted); border-color: var(--line); cursor: default; }
 .scrubber input[type=range] { width: 100%; accent-color: var(--accent); margin: 2px 0; }
 .scrub-ends { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.ctl-toggle { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2);
+  margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line-soft); cursor: pointer; }
+.ctl-toggle input { width: auto; accent-color: var(--accent); }
+.legend-caveat { margin-top: 8px; font-size: 10.5px; line-height: 1.4; color: var(--muted);
+  max-width: 220px; border-top: 1px solid var(--line-soft); padding-top: 6px; }
 
 /* ============================ per-cell timeline ============================ */
 .cellhist { margin: 6px 0 10px; }

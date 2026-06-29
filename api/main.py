@@ -17,7 +17,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.deps import get_settings
-from api.routers import admin, cells, events, labeling, layers, review
+from api.routers import admin, cells, control, events, labeling, layers, review
 
 # The static HTML operator UI (web/) is served by this same app at /ui/, so the front-end and
 # the API share one origin (no CORS) and one command (`uvicorn api.main:app`) runs everything.
@@ -44,7 +44,7 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
     # admin first (owns /healthz); order is cosmetic — paths are absolute.
-    for module in (admin, events, cells, layers, review, labeling):
+    for module in (admin, events, cells, layers, review, labeling, control):
         app.include_router(module.router)
 
     # Operator UI at /ui/ (html=True serves index.html); "/" redirects there for convenience.
