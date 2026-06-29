@@ -18,6 +18,13 @@ This is a damage *proxy*: a backscatter change is real change, not proof of a de
 building. So it emits a configurable, conservative obs_type with magnitude-banded confidence,
 single-family (copernicus_sar) ⇒ Rumored until a second family corroborates. The deep model
 (3h) refines the change into a specific damage type later.
+
+VALIDATED on real Sentinel-1 (Mariupol, pre-invasion vs May-2022, 20m, vs UNOSAT — see
+eval/validate_sar.py): at 3-4 dB it finds 100% of UNOSAT damage cells but at ~18% precision
+(it sees ALL change, not just damage); tightening to 8 dB reaches ~32% precision / ~47% recall
+(best F1 ≈ 0.38). This is the deterministic baseline the deep model (3h) must beat. Because its
+role here is CORROBORATION (false positives corroborate nothing and the land-cover gate
+penalises implausible 'building_damaged'), the default leans toward recall.
 """
 from __future__ import annotations
 
