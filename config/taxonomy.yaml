@@ -168,9 +168,11 @@ block_params:
   armor_move:   {radius_m: 8000,  window_hours: 12}
   convoy:       {radius_m: 5000,  window_hours: 8}
   naval_transit: {radius_m: 25000, window_hours: 12}
-  # Imagery detections (Phase 3): damage persists, acquisition windows are wide.
-  building_damaged:     {radius_m: 1500, window_hours: 24}
-  crater:               {radius_m: 1500, window_hours: 24}
+  # Imagery detections (Phase 3): damage persists, so the window is WIDE — a satellite
+  # acquisition and a UNOSAT/news assessment of the same destruction are days-to-weeks apart
+  # but describe one persistent damaged state, and should corroborate (720h = 30 days).
+  building_damaged:     {radius_m: 1500, window_hours: 720}
+  crater:               {radius_m: 1500, window_hours: 720}
   flood:                {radius_m: 5000, window_hours: 72}
   burn_scar:            {radius_m: 3000, window_hours: 48}
   installation_change:  {radius_m: 3000, window_hours: 72}
