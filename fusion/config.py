@@ -73,6 +73,17 @@ class FusionConfig:
         bp = self._block_params.get(obs_type) or self._block_params["_default"]
         return float(bp["window_hours"]) * 3600.0
 
+    # ---- temporal-score time constant (type-aware) ----
+    # Transient events (strike/fire/movement) decay over the global tau_time_s (hours): a stale
+    # report is weak evidence. PERSISTENT-STATE types (damage/flood/burn — those with a wide block
+    # window ≥48h) describe a lasting condition, so a satellite pass and a ground assessment weeks
+    # apart still corroborate; their decay constant is the (wide) block window itself.
+    _PERSISTENT_MIN_S = 48 * 3600.0
+
+    def time_tau_s(self, a_type: str, b_type: str) -> float:
+        widest = max(self.block_window_s(a_type), self.block_window_s(b_type))
+        return widest if widest >= self._PERSISTENT_MIN_S else self.tau_time_s
+
     # ---- landcover plausibility ----
     def landcover_penalty(self, obs_type: str, landcover_code) -> float:
         rule = self._landcover.get(obs_type)

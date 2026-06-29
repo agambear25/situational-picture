@@ -57,9 +57,13 @@ llm:
     fallback: keep_separate_and_flag
 
   # --- Timeouts ---
-  gate_timeout_s: 8
-  adjudicator_timeout_s: 20
-  escalation_timeout_s: 60
+  # Sized for local CPU/Metal inference on a 16GB Mac: a 14B q4 call (incl. first-load + a short
+  # JSON verdict) can take well over 20s. Too-tight timeouts trip the circuit breaker and silently
+  # degrade every gray pair to keep-separate. Pre-warm the model (ollama run … "") to avoid paying
+  # the load inside the first call.
+  gate_timeout_s: 30
+  adjudicator_timeout_s: 150
+  escalation_timeout_s: 240
 
   # --- Ollama server ---
   ollama_base_url: "http://localhost:11434"

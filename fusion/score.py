@@ -74,7 +74,10 @@ def _s_time(a, b, cfg: FusionConfig) -> float:
     if overlap > 0:
         return overlap
     gap = temporal_gap_s(a.occurred_start, a.occurred_end, b.occurred_start, b.occurred_end)
-    return math.exp(-gap / cfg.tau_time_s) if cfg.tau_time_s > 0 else 0.0
+    # Type-aware decay: persistent-state types (damage/flood/burn) tolerate week–month gaps;
+    # transient events keep the global (hours) constant. See FusionConfig.time_tau_s.
+    tau = cfg.time_tau_s(a.obs_type, b.obs_type)
+    return math.exp(-gap / tau) if tau > 0 else 0.0
 
 
 def _s_text(a, b, cfg: FusionConfig) -> float:
