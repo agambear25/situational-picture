@@ -3,20 +3,24 @@
 # Bump model_version/prompt_version/schema_version → invalidates only affected verdicts.
 
 llm:
+  # Model tags are the plain Ollama tags (qwen2.5:Nb defaults to the instruct q4_K_M build) so
+  # they match `ollama pull qwen2.5:Nb`. On a 16GB Apple-Silicon Mac, 14B (~9GB q4) is the
+  # practical local ceiling — 32B (~20GB) / 70B (~40GB) do not fit. Adjudicator bumped 7B→14B
+  # for quality (the gray-band same/different judgement); the cheap 3B still triages first.
   # --- Gate tier (fast first pass) ---
-  gate_model: "qwen2.5:3b-instruct-q4_K_M"
+  gate_model: "qwen2.5:3b"
   gate_model_version: "qwen2.5-3b-v1"
   # Escalate to adjudicator if gate confidence < gate_gamma (see thresholds.yaml)
 
-  # --- Adjudicator tier (workhorse) ---
-  adjudicator_model: "qwen2.5:7b-instruct-q4_K_M"
-  adjudicator_model_version: "qwen2.5-7b-v1"
+  # --- Adjudicator tier (workhorse) — bumped to 14B (best that fits 16GB) ---
+  adjudicator_model: "qwen2.5:14b"
+  adjudicator_model_version: "qwen2.5-14b-v1"
   # Escalate to terminal if adjudicator confidence < escalation_gamma (see thresholds.yaml)
 
   # --- Terminal escalation tier (local, not Claude) ---
   # Per your decision: local 14B replaces Claude as the terminal tier.
   # 14B is not Claude-grade but fails safe: uncertain → keep-separate + flag, never silent merge.
-  escalation_model: "qwen2.5:14b-instruct-q4_K_M"
+  escalation_model: "qwen2.5:14b"
   escalation_model_version: "qwen2.5-14b-v1"
 
   # --- Claude (PAID, OFF by default) ---
@@ -60,4 +64,4 @@ llm:
   # --- Ollama server ---
   ollama_base_url: "http://localhost:11434"
   # RAM rule: keep 3B resident; swap 7B↔14B on demand (never co-resident with rasterio/HNSW build)
-  resident_model: "qwen2.5:3b-instruct-q4_K_M"
+  resident_model: "qwen2.5:3b"

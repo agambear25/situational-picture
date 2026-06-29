@@ -221,8 +221,16 @@ def detections_to_observations(cds: list[CachedDetection], source_id: str, famil
     The cell_id is taken straight from each detection (authoritative), so the placement is
     stable even for zone-edge cells — no centroid round-trip, no re-resolution. Reuses the
     contract's content_hash / embedding logic so imagery obs are written exactly like any other.
+    The CELL is the observation unit, so multiple change clusters that fall in the same cell are
+    collapsed to ONE observation (the highest-confidence cluster). Without this, a dense change
+    field emits several near-duplicate obs per cell, which explodes the fusion pair count.
     """
     from ingest.contract import observation_from_cell
+    best_by_cell: dict[str, CachedDetection] = {}
+    for cd in cds:
+        cur = best_by_cell.get(cd.cell_id)
+        if cur is None or (cd.self_conf or 0) > (cur.self_conf or 0):
+            best_by_cell[cd.cell_id] = cd
     return [
         observation_from_cell(
             cell_id=cd.cell_id, theater_id=theater_id, source_id=source_id,
@@ -232,5 +240,5 @@ def detections_to_observations(cds: list[CachedDetection], source_id: str, famil
             text=cd.text, self_conf=cd.self_conf, meta=cd.meta,
             taxonomy=taxonomy, embedder=embedder,
         )
-        for cd in cds
+        for cd in best_by_cell.values()
     ]

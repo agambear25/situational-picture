@@ -171,6 +171,9 @@ block_params:
   # Imagery detections (Phase 3): damage persists, so the window is WIDE — a satellite
   # acquisition and a UNOSAT/news assessment of the same destruction are days-to-weeks apart
   # but describe one persistent damaged state, and should corroborate (720h = 30 days).
+  # The per-cell dedup in detections_to_observations is what controls the pair count (one imagery
+  # obs per cell); radius stays at the eval-tuned 1500m. Cross-cell pairs score 'different' on
+  # distance, so the gray band (→ adjudicator) is dominated by same-cell cross-source pairs.
   building_damaged:     {radius_m: 1500, window_hours: 720}
   crater:               {radius_m: 1500, window_hours: 720}
   flood:                {radius_m: 5000, window_hours: 72}
