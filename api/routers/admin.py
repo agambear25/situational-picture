@@ -72,16 +72,37 @@ def rejections(
 
 
 @router.get("/insights")
-def insights() -> dict:
-    """Honest stub for the Phase 4 assessment layer. We return availability=False rather than
-    inventing scores, so consumers never mistake an empty/placeholder for a real assessment."""
+def insights(theater_id: str | None = Query(default=None), conn=Depends(get_conn)) -> dict:
+    """Phase-4a assessments: the ranked 'what matters' feed (significance) + per-cell anomalies.
+
+    Reads world.assessment (materialised by assess.run). Each item carries a plain rationale and
+    a cell-only centroid + place label — no precise coordinate leaves the API. Returns
+    available=False (not a fake score) when the assessment table is empty for the theater.
+    """
+    s = get_settings()
+    theater_id = theater_id or s["default_theater"]
+    from api.coarsen import cell_geometry
+    from api.places import nearest_place
+
+    def _locate(cell_id: str) -> dict:
+        try:
+            centroid = cell_geometry(cell_id, "cell_centroid")
+            lon, lat = centroid["coordinates"]
+            return {"centroid": centroid, "place": nearest_place(lon, lat)}
+        except Exception:  # noqa: BLE001 — a missing place label must never break /insights
+            return {"centroid": None, "place": None}
+
+    significant = queries.top_significant(conn, theater_id, limit=25)
+    for item in significant:
+        item.update(_locate(item["cell_id"]))
+    anomalies = queries.anomaly_assessments(conn, theater_id, limit=20)
+    for item in anomalies:
+        item.update(_locate(item["cell_id"]))
+
     return {
-        "status": "stub",
-        "available": False,
-        "message": (
-            "Assessment layer (significance/anomaly/mobility/flood/exposure/gaps) "
-            "lands in Phase 4."
-        ),
+        "available": bool(significant or anomalies),
+        "significant": significant,
+        "anomalies": anomalies,
     }
 
 

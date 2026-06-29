@@ -548,3 +548,54 @@ button.btn.danger:hover { border-color: var(--danger); color: var(--danger); }
 .tl-date { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tl-body { display: flex; align-items: center; gap: 8px; }
 .tl-type { text-transform: capitalize; font-size: 13px; }
+
+/* ============================================================================
+   What matters — the Phase-4a assessment feed (priorities + anomalies).
+   Reuses the band tokens; a ranked card with a priority bar and a plain rationale.
+   ============================================================================ */
+.sig-card {
+  position: relative;
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--band-rumored);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px 12px;
+  margin: 8px 0;
+  cursor: pointer;
+  transition: background .14s, border-color .14s, transform .06s;
+}
+.sig-card:hover { background: var(--panel-3); border-color: var(--line); }
+.sig-card:active { transform: translateY(1px); }
+.sig-card[data-band="High"]    { border-left-color: var(--band-high); }
+.sig-card[data-band="Medium"]  { border-left-color: var(--band-medium); }
+.sig-card[data-band="Low"]     { border-left-color: var(--band-low); }
+.sig-card[data-band="Rumored"] { border-left-color: var(--band-rumored); }
+.sig-top { display: flex; align-items: center; gap: 9px; }
+.sig-rank {
+  flex: none; width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--panel-3); color: var(--text-2);
+  font: 600 11px/1 var(--mono); border: 1px solid var(--line);
+}
+.sig-place { flex: 1; font-weight: 600; font-size: 13.5px; color: var(--text); }
+.sig-type { color: var(--muted); font-weight: 400; text-transform: capitalize; }
+.sig-bar {
+  height: 4px; border-radius: 3px; background: var(--panel-3);
+  margin: 9px 0 7px; overflow: hidden;
+}
+.sig-bar > span { display: block; height: 100%; border-radius: 3px; }
+.sig-why { font-size: 12px; color: var(--text-2); line-height: 1.45; }
+
+.anom-card {
+  background: var(--panel-2); border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm); padding: 10px 13px; margin: 8px 0; cursor: pointer;
+  transition: background .14s, border-color .14s;
+}
+.anom-card:hover { background: var(--panel-3); border-color: var(--line); }
+.anom-top { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+.anom-badge {
+  flex: none; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+}
+.anom-badge.spike { background: var(--band-medium-soft); color: var(--band-medium); }
+.anom-badge.esc   { background: var(--band-high-soft);   color: var(--band-high); }
+.anom-place { font-weight: 600; font-size: 13px; color: var(--text); }

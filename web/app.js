@@ -164,10 +164,92 @@ function focusEvent(ev) {
 }
 
 /* ---- tabs ---- */
-const TABS = { events: renderEvents, review: renderReview, add: renderAdd, health: renderHealth };
+const TABS = { insights: renderInsights, events: renderEvents, review: renderReview, add: renderAdd, health: renderHealth };
 function setTab(tab) {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   (TABS[tab] || renderEvents)();
+}
+
+/* ---- What matters (the Phase-4a assessment feed) ---- */
+async function renderInsights() {
+  const panel = document.getElementById("panel");
+  panel.innerHTML = `<div class="hint">The system's read on <b>what to look at first</b> — ranked by how
+    severe, confirmed, recent and unusual each event is.</div><div id="insights" class="empty">Loading…</div>`;
+  let data;
+  try { data = await api(`/insights?theater_id=${THEATER}`); }
+  catch (e) { document.getElementById("insights").innerHTML = `<div class="empty">Couldn't load: ${esc(e.message)}</div>`; return; }
+  const sig = (data && data.significant) || [], anom = (data && data.anomalies) || [];
+  if (!data || !data.available) {
+    document.getElementById("insights").textContent = "No assessments yet — run the assessment engine (assess.run).";
+    return;
+  }
+  drawInsightMarkers(sig, anom);
+  document.getElementById("insights").outerHTML = `
+    <div id="insights">
+      <div class="section-title">Priorities <span class="muted">· top ${sig.length}</span></div>
+      ${sig.length ? sig.map(insightCard).join("") : `<div class="muted">Nothing scored.</div>`}
+      <div class="section-title" style="margin-top:14px">Unusual activity</div>
+      <div class="hint">Cells with a recent flare-up or a jump to a more severe kind of event.</div>
+      ${anom.length ? anom.map(anomCard).join("") : `<div class="muted">No anomalies flagged.</div>`}
+    </div>`;
+  panel.querySelectorAll(".sig-card").forEach((c) => (c.onclick = () => selectEvent(c.dataset.id)));
+  panel.querySelectorAll(".anom-card").forEach((c) => (c.onclick = () => focusCell(c.dataset.lat, c.dataset.lon)));
+}
+function insightCard(x, i) {
+  const band = BANDS[x.confidence_band] ? x.confidence_band : "Rumored";
+  const place = (x.place && x.place.label) || ("area " + x.cell_id);
+  const pct = Math.max(4, Math.round(x.score * 100));
+  return `<div class="sig-card" data-id="${esc(x.event_id)}" data-band="${band}">
+    <div class="sig-top">
+      <span class="sig-rank">${i + 1}</span>
+      <span class="sig-place">${esc(place)}<span class="sig-type"> · ${esc(String(x.event_type).replace(/_/g, " "))}</span></span>
+      <span class="pill ${BANDS[band].cls}">${BANDS[band].plain}</span>
+    </div>
+    <div class="sig-bar" title="priority ${pct}%"><span style="width:${pct}%;background:${BANDS[band].color}"></span></div>
+    <div class="sig-why">${esc(x.rationale)}</div>
+  </div>`;
+}
+function anomCard(a) {
+  const place = (a.place && a.place.label) || ("area " + a.cell_id);
+  const esc8 = a.subkind === "escalation";
+  const c = a.centroid && a.centroid.coordinates;
+  return `<div class="anom-card" data-cell="${esc(a.cell_id)}"${c ? ` data-lat="${c[1]}" data-lon="${c[0]}"` : ""}>
+    <div class="anom-top">
+      <span class="anom-badge ${esc8 ? "esc" : "spike"}">${esc8 ? "▲ Escalation" : "◉ Flare-up"}</span>
+      <span class="anom-place">${esc(place)}</span>
+    </div>
+    <div class="sig-why">${esc(a.rationale)}</div>
+  </div>`;
+}
+function drawInsightMarkers(sig, anom) {
+  eventLayer.clearLayers();
+  sig.forEach((x, i) => {
+    const c = x.centroid && x.centroid.coordinates;
+    if (!c) return;
+    const band = BANDS[x.confidence_band] ? x.confidence_band : "Rumored";
+    const color = BANDS[band].color;
+    L.circleMarker([c[1], c[0]], { radius: 5 + Math.round(x.score * 11), color, weight: 2, fillColor: color, fillOpacity: 0.6 })
+      .on("click", () => selectEvent(x.event_id)).addTo(eventLayer);
+    if (i < 8 && x.place && x.place.label)
+      L.marker([c[1], c[0]], { interactive: false,
+        icon: L.divIcon({ className: "place-label", html: esc(x.place.label), iconAnchor: [-12, 8] }) }).addTo(eventLayer);
+  });
+  anom.forEach((a) => {
+    const c = a.centroid && a.centroid.coordinates;
+    if (!c) return;
+    const col = a.subkind === "escalation" ? "#ff5a52" : "#ffb13d";
+    L.circle([c[1], c[0]], { radius: 2600, color: col, weight: 2, opacity: 0.85, dashArray: "5 5",
+      fill: false, interactive: false }).addTo(eventLayer);
+  });
+  loadControl(UNTIL);
+  const chip = document.getElementById("mapChipN");
+  if (chip) chip.textContent = sig.length;
+}
+function focusCell(lat, lon) {
+  if (lat == null || lon == null) return;
+  if (selectedLayer) { map.removeLayer(selectedLayer); selectedLayer = null; }
+  selectedLayer = L.circleMarker([+lat, +lon], { radius: 15, color: "#fff", weight: 2, fill: false }).addTo(map);
+  map.setView([+lat, +lon], Math.max(map.getZoom(), 11));
 }
 
 /* ---- Events list ---- */
@@ -455,6 +537,6 @@ async function boot() {
     status.textContent = "● backend offline"; status.className = "status off";
     toast("Can't reach the backend. Start it with: uvicorn api.main:app", true);
   }
-  setTab("events");
+  setTab("insights");
 }
 boot();

@@ -386,6 +386,48 @@ def _uuid_array(v) -> list[str]:
     return [str(x) for x in v]
 
 
+# --------------------------------------------------------------------------- assessments (Phase 4a)
+
+def top_significant(conn, theater_id: str, limit: int = 20) -> list[dict]:
+    """The ranked 'what to look at' feed — significance assessments joined to their events."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT a.event_id, a.score, a.rationale, a.components,
+                   e.event_type, e.confidence_band, e.cell_id, e.n_independent_families,
+                   lower(e.occurred_at)
+            FROM world.assessment a
+            JOIN world.event e ON e.event_id = a.event_id
+            WHERE a.theater_id = %s AND a.assessment_type = 'significance'
+            ORDER BY a.score DESC, e.event_id
+            LIMIT %s
+            """,
+            (theater_id, limit),
+        )
+        return [{
+            "event_id": str(r[0]), "score": r[1], "rationale": r[2], "components": r[3] or {},
+            "event_type": r[4], "confidence_band": r[5], "cell_id": r[6],
+            "n_independent_families": r[7], "occurred_start": _iso(r[8]),
+        } for r in cur.fetchall()]
+
+
+def anomaly_assessments(conn, theater_id: str, limit: int = 20) -> list[dict]:
+    """Per-cell anomaly assessments (activity spikes / escalations), highest first."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT subkind, cell_id, score, rationale, components
+            FROM world.assessment
+            WHERE theater_id = %s AND assessment_type = 'anomaly'
+            ORDER BY score DESC, cell_id
+            LIMIT %s
+            """,
+            (theater_id, limit),
+        )
+        return [{"subkind": r[0], "cell_id": r[1], "score": r[2], "rationale": r[3],
+                 "components": r[4] or {}} for r in cur.fetchall()]
+
+
 def _iso(v):
     if v is None:
         return None

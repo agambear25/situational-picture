@@ -1,0 +1,50 @@
+# assessment.yaml — Phase-4a knobs for the insights engine (significance + anomaly).
+# Deterministic scoring over the read model; no magic numbers in code.
+
+assessment:
+  # significance = severity × confidence × recency × novelty   (each in [0,1])
+  significance:
+    recency_tau_days: 14.0          # recency = exp(-age_days / tau); recent events score higher
+    # Floor so a major HISTORICAL event still surfaces: recency_factor = floor + (1-floor)·decay.
+    # Without it, the time-decay zeroes everything older than ~2 months and the feed is just the
+    # newest low-value reports. 0.4 lets severity × confidence carry notable past events.
+    recency_floor: 0.5
+    # Per-event-type severity weight [0,1]. Higher = inherently more important to surface.
+    severity:
+      missile_launch:        0.95
+      bridge_destroyed:      0.95
+      airstrike:             0.90
+      strike:                0.85
+      naval_engagement:      0.85
+      building_damaged:      0.80
+      hospital_event:        0.85
+      civilian_displacement: 0.80
+      bridge_damaged:        0.75
+      artillery_fire:        0.75
+      explosion:             0.75
+      crater:                0.70
+      utility_damaged:       0.70
+      armor_move:            0.65
+      troop_move:            0.60
+      convoy:                0.60
+      flood:                 0.65
+      crossing:              0.55
+      naval_mine:            0.70
+      naval_transit:         0.45
+      road_blocked:          0.50
+      checkpoint_established: 0.45
+      checkpoint_removed:    0.45
+      burn_scar:             0.45
+      installation_change:   0.65
+      fire:                  0.40
+      humanitarian_delivery: 0.30
+      other:                 0.30
+      _default:              0.50
+
+  # Per-cell anomaly detection over the chronology.
+  anomaly:
+    recent_window_days: 10.0        # what counts as "recent" activity
+    baseline_window_days: 120.0     # the history we compare against
+    spike_min_recent: 3             # >= this many recent events to consider a spike
+    spike_ratio: 2.0                # recent rate must exceed baseline rate by this factor
+    min_significance: 0.15          # drop trivially-low significance assessments from /insights
