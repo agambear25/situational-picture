@@ -63,15 +63,17 @@ class SarLogRatioDetector:
             if before is None or after is None or before.shape != after.shape:
                 continue
             delta = after - before            # dB difference = log-ratio
-            # The detection is MADE at the 'after' acquisition, so the observation is timestamped
-            # there (so it blocks with events co-temporal to detection). The change *interval*
-            # (last-before → after) is kept in meta for provenance, not as the occurred window.
-            latest = group[-1]
+            # Timestamp the detection at the 'after' acquisition (the change interval is kept in
+            # meta for provenance). Co-located corroboration is handled in fusion by the
+            # persistent-type same-cell rule, not by widening the observation's time span (a wide
+            # span makes the temporal-overlap ratio vanish).
+            occ_start = group[-1].acq_start
+            occ_end = group[-1].acq_end
             change_from = group[mid - 1].acq_start
-            out.extend(self._emit(delta, bbox, latest, change_from))
+            out.extend(self._emit(delta, bbox, occ_start, occ_end, change_from, group[-1]))
         return out
 
-    def _emit(self, delta, bbox, latest: Tile, change_from) -> list[RawObservation]:
+    def _emit(self, delta, bbox, occ_start, occ_end, change_from, latest: Tile) -> list[RawObservation]:
         mask = np.abs(delta) >= self.threshold_db
         if not mask.any():
             return []
@@ -90,14 +92,14 @@ class SarLogRatioDetector:
             obs.append(RawObservation(
                 theater_id=self.theater_id, source_id=self.source_id,
                 source_family_id=self.family_id, modality="imagery", obs_type=self.obs_type,
-                occurred_start=latest.acq_start, occurred_end=latest.acq_end,
+                occurred_start=occ_start, occurred_end=occ_end,
                 geo=GeoRef(lon=lon, lat=lat, precision_m=precision_m),
                 text=(f"SAR backscatter {direction} of {mag:.1f} dB over ~{int(ys.size)} px "
                       f"(Sentinel-1 {self.band} log-ratio change)"),
                 self_conf=_magnitude_conf(mag, self.threshold_db, self.saturate_db),
                 meta={"detector": self.name, "delta_db": round(mag, 2), "direction": direction,
                       "n_pixels": int(ys.size), "model_digest": self.model_digest,
-                      "change_from": change_from.isoformat(), "change_to": latest.acq_end.isoformat()},
+                      "change_from": change_from.isoformat(), "change_to": occ_end.isoformat()},
             ))
         return obs
 

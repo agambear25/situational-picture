@@ -55,8 +55,25 @@ def fuse(
             ))
     counters.pairs_seen = len(scored)
 
-    same_edges = [(sp.obs_a, sp.obs_b) for sp in scored if sp.band == "same"]
-    gray_pairs = [(sp.obs_a, sp.obs_b) for sp in scored if sp.band == "gray"]
+    # Deterministic CO-LOCATED corroboration: two observations from DIFFERENT source families in
+    # the SAME 1km cell with a compatible type (and within-window — guaranteed by blocking) are
+    # independent sensors agreeing on the same place. That is corroboration by GEOMETRY, not a
+    # "do the texts match?" question — so we merge them directly and keep them OUT of the gray
+    # band. This both lifts cross-modal damage to multi-source AND stops a dense imagery field
+    # from generating O(N^2) LLM adjudications (the gray band stays sparse: only ambiguous
+    # cross-cell pairs reach the model).
+    same_edges, gray_pairs = [], []
+    for sp in scored:
+        if sp.band == "same":
+            same_edges.append((sp.obs_a, sp.obs_b))
+            continue
+        a, b = obs_by_id[sp.obs_a], obs_by_id[sp.obs_b]
+        coloc = (a.cell_id == b.cell_id and a.source_family_id != b.source_family_id
+                 and cfg.is_persistent_type(a.obs_type) and cfg.is_persistent_type(b.obs_type))
+        if coloc:
+            same_edges.append((sp.obs_a, sp.obs_b))      # co-located independent corroboration
+        elif sp.band == "gray":
+            gray_pairs.append((sp.obs_a, sp.obs_b))
 
     # 3. ADJUDICATE (gray band only)
     decisions = adjudicate(gray_pairs, obs_by_id, cache, backend, llm_cfg, counters, ctx_lookup)

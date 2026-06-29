@@ -84,6 +84,12 @@ class FusionConfig:
         widest = max(self.block_window_s(a_type), self.block_window_s(b_type))
         return widest if widest >= self._PERSISTENT_MIN_S else self.tau_time_s
 
+    def is_persistent_type(self, obs_type: str) -> bool:
+        """A persistent-STATE type (damage/flood/burn — wide block window). Two independent
+        sensors on the same cell with such a type corroborate geometrically; transient events
+        (strikes/fires) can coincide in a cell without being the same event, so they don't."""
+        return self.block_window_s(obs_type) >= self._PERSISTENT_MIN_S
+
     # ---- landcover plausibility ----
     def landcover_penalty(self, obs_type: str, landcover_code) -> float:
         rule = self._landcover.get(obs_type)
