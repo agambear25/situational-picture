@@ -88,7 +88,7 @@ def insights(theater_id: str | None = Query(default=None), conn=Depends(get_conn
         try:
             centroid = cell_geometry(cell_id, "cell_centroid")
             lon, lat = centroid["coordinates"]
-            return {"centroid": centroid, "place": nearest_place(lon, lat)}
+            return {"centroid": centroid, "place": nearest_place(lon, lat, theater_id)}
         except Exception:  # noqa: BLE001 — a missing place label must never break /insights
             return {"centroid": None, "place": None}
 
@@ -106,6 +106,23 @@ def insights(theater_id: str | None = Query(default=None), conn=Depends(get_conn
         "exposure": exposure,
         "gaps": gaps,
     }
+
+
+@router.get("/theaters")
+def theaters(conn=Depends(get_conn)) -> dict:
+    """Theaters that actually have data, with label + bbox (so the UI can switch + re-center)."""
+    import yaml
+    from pathlib import Path
+    cfg = yaml.safe_load((Path(__file__).resolve().parents[2] / "config" / "theaters.yaml")
+                         .read_text(encoding="utf-8"))["theaters"]
+    with conn.cursor() as cur:
+        cur.execute("SELECT theater_id, count(*) FROM world.event GROUP BY 1")
+        counts = {r[0]: r[1] for r in cur.fetchall()}
+    out = [{"theater_id": tid, "label": t.get("label", tid), "bbox": t.get("bbox"),
+            "n_events": counts.get(tid, 0)}
+           for tid, t in cfg.items() if counts.get(tid, 0) > 0]
+    out.sort(key=lambda x: -x["n_events"])
+    return {"theaters": out}
 
 
 @router.post("/admin/replay")

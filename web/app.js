@@ -8,6 +8,7 @@
 
 const API = "";                       // same origin (served by the API at /ui/)
 let THEATER = "ua_donbas";
+let THEATERS = [];          // [{theater_id, label, bbox, n_events}] — populated from /theaters
 let map, eventLayer, selectedLayer, controlLayer, featureLayer, aoiLayer, drawHandler;
 const T_MIN = Date.UTC(2022, 1, 24);  // 2022-02-24, the full-scale invasion — chronology start
 let UNTIL = null;                      // null = live (everything); else "YYYY-MM-DD" cumulative cut-off
@@ -29,9 +30,12 @@ const BANDS = {
 // Classify a report's source family for the colour-coded evidence timeline.
 function srcKind(o) {
   const m = (o.modality || "").toLowerCase(), f = (o.source_family_id || "").toLowerCase();
-  if (m === "imagery" || f.includes("copernicus") || f.includes("sentinel")) return { k: "sat", label: "Satellite radar" };
+  if (f.includes("optical")) return { k: "sat", label: "Satellite optical" };
+  if (f.includes("sar") || f.includes("sentinel1")) return { k: "sat", label: "Satellite radar" };
+  if (f.includes("unosat")) return { k: "sat", label: "Damage assessment" };
   if (m === "thermal" || f.includes("firms") || f.includes("modis")) return { k: "thermal", label: "Thermal / fire" };
-  return { k: "news", label: "News report" };
+  if (m === "imagery" || f.includes("copernicus") || f.includes("sentinel")) return { k: "sat", label: "Satellite imagery" };
+  return { k: "news", label: "News / report" };
 }
 const UNCORROBORATED = ["single-source", "echo-only", "verification-needed"];
 const FLAG_PLAIN = {
@@ -479,6 +483,13 @@ async function selectEvent(id) {
     </div>`;
   }).join("") || `<div class="muted">No reports attached.</div>`;
 
+  // Provenance — the distinct sensor types that saw this event (makes the multi-modal fusion visible).
+  const _seen = [...new Map((ev.observations || []).map((o) => { const s = srcKind(o); return [s.label, s]; })).values()];
+  const provenance = _seen.length
+    ? `<div class="provenance"><span class="prov-label">Seen by</span>${_seen.map((s) =>
+        `<span class="prov ${s.k}">${s.label}</span>`).join("")}</div>`
+    : "";
+
   const ctxFields = [["label","Area name"],["admin_l1","Region"],["admin_l2","District"],
     ["admin_l3","Locality"],["landcover_label","Land type"],["builtup_pct","Built-up %"],
     ["has_bridge","Bridge nearby"],["nearest_road_class","Nearest road"]];
@@ -492,6 +503,7 @@ async function selectEvent(id) {
     <div class="muted" style="text-transform:capitalize;margin-bottom:4px">${esc(ev.event_type)}${ev.place && ev.place.distance_km != null ? ` · ~${ev.place.distance_km} km from ${esc(ev.place.name)}` : ""}</div>
     <div class="code">area ${esc(ev.cell_id)} · id ${esc(ev.event_id)}</div>
     ${warns}
+    ${provenance}
     <div class="cellhist"><span class="backlink" id="cellHist">▤ See this area's full history over time ›</span></div>
     <div class="why" data-band="${band}"><p><b>Why “${BANDS[band].plain}”?</b> ${BANDS[band].meaning}.</p></div>
     <div class="metrics">
@@ -792,6 +804,32 @@ async function focusAoi(id) {
   panel.querySelectorAll(".card").forEach((c) => (c.onclick = () => selectEvent(c.dataset.id)));
 }
 
+/* ---- theaters: switch the board between regions (Ukraine land, Black Sea maritime, …) ---- */
+async function loadTheaters() {
+  const sel = document.getElementById("theaterSel");
+  try { const d = await api("/theaters"); THEATERS = (d && d.theaters) || []; } catch (e) { THEATERS = []; }
+  if (!sel) return;
+  if (!THEATERS.length) { sel.innerHTML = `<option>${esc("Ukraine — " + THEATER)}</option>`; return; }
+  sel.innerHTML = THEATERS.map((t) =>
+    `<option value="${esc(t.theater_id)}">${esc(t.label)} · ${t.n_events.toLocaleString()} events</option>`).join("");
+  if (!THEATERS.some((t) => t.theater_id === THEATER)) THEATER = THEATERS[0].theater_id;
+  sel.value = THEATER;
+  sel.onchange = () => switchTheater(sel.value);
+}
+function switchTheater(tid) {
+  THEATER = tid;
+  UNTIL = null;
+  const t = THEATERS.find((x) => x.theater_id === tid);
+  if (t && t.bbox && map) {
+    const [w, s, e, n] = t.bbox;
+    try { map.invalidateSize(); map.fitBounds([[s, w], [n, e]], { padding: [20, 20] }); } catch (_) {}
+  }
+  if (aoiLayer) aoiLayer.clearLayers();
+  FEATURE_ON = {};                        // feature layers are per-theater
+  const active = document.querySelector(".tabs button.active")?.dataset.tab || "insights";
+  setTab(active);
+}
+
 /* ---- boot ---- */
 async function boot() {
   initMap();
@@ -803,10 +841,10 @@ async function boot() {
   try {
     const h = await api("/healthz");
     THEATER = (h && h.theater) || THEATER;
-    document.getElementById("theater").textContent = "Ukraine — " + THEATER;
     status.textContent = STATIC_MODE ? "● live demo (snapshot)" : "● connected";
     status.className = "status ok";
     if (STATIC_MODE) toast("Live demo — a read-only snapshot of the board. Drawing & filters are disabled.");
+    await loadTheaters();
   } catch (e) {
     status.textContent = "● backend offline"; status.className = "status off";
     toast("Can't reach the backend. Start it with: uvicorn api.main:app", true);

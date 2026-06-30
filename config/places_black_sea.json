@@ -1,0 +1,23 @@
+{
+  "_note": "Gazetteer for the Black Sea / Crimea theater — nearest-settlement labelling for events + vessels. Approximate city coordinates, enough for 1km-cell labelling. Covers Crimea + the southern Kherson coast.",
+  "places": [
+    {"name": "Sevastopol", "lon": 33.52, "lat": 44.60},
+    {"name": "Simferopol", "lon": 34.10, "lat": 44.95},
+    {"name": "Kerch", "lon": 36.47, "lat": 45.36},
+    {"name": "Yalta", "lon": 34.17, "lat": 44.50},
+    {"name": "Yevpatoriia", "lon": 33.36, "lat": 45.19},
+    {"name": "Feodosiia", "lon": 35.38, "lat": 45.03},
+    {"name": "Dzhankoi", "lon": 34.39, "lat": 45.71},
+    {"name": "Saky", "lon": 33.60, "lat": 45.13},
+    {"name": "Bakhchysarai", "lon": 33.86, "lat": 44.75},
+    {"name": "Krasnoperekopsk", "lon": 33.79, "lat": 45.95},
+    {"name": "Armiansk", "lon": 33.69, "lat": 46.11},
+    {"name": "Alushta", "lon": 34.41, "lat": 44.68},
+    {"name": "Sudak", "lon": 34.97, "lat": 44.85},
+    {"name": "Chornomorske", "lon": 32.70, "lat": 45.51},
+    {"name": "Henichesk", "lon": 34.81, "lat": 46.17},
+    {"name": "Skadovsk", "lon": 32.91, "lat": 46.12},
+    {"name": "Kherson", "lon": 32.62, "lat": 46.64},
+    {"name": "Nova Kakhovka", "lon": 33.37, "lat": 46.75}
+  ]
+}

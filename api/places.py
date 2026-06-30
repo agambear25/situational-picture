@@ -16,17 +16,18 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-_PATH = Path(__file__).resolve().parents[1] / "config" / "places_ua_donbas.json"
+_CONFIG = Path(__file__).resolve().parents[1] / "config"
 
 # Distance bands for the label wording (km from the nearest settlement centroid).
 _IN_TOWN_KM = 4.0      # within this → just the town name
 _NEAR_KM = 18.0        # within this → "near <town>"; beyond → rural, name as a reference only
 
 
-@lru_cache(maxsize=1)
-def _places() -> list[dict]:
+@lru_cache(maxsize=8)
+def _places(theater_id: str) -> list[dict]:
+    """The gazetteer for a theater (config/places_<theater>.json), or [] if there isn't one."""
     try:
-        return json.loads(_PATH.read_text(encoding="utf-8")).get("places", [])
+        return json.loads((_CONFIG / f"places_{theater_id}.json").read_text(encoding="utf-8")).get("places", [])
     except (OSError, ValueError):
         return []
 
@@ -40,14 +41,14 @@ def _haversine_km(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
     return 2 * r * math.asin(min(1.0, math.sqrt(a)))
 
 
-def nearest_place(lon: float, lat: float) -> Optional[dict]:
+def nearest_place(lon: float, lat: float, theater_id: str = "ua_donbas") -> Optional[dict]:
     """Return {name, label, distance_km} for the nearest known settlement, or None if no gazetteer.
 
     `label` is the operator-facing string: the town name when on top of it, "near <town>" when
     close, or "rural area near <town>" when far (so a fire in farmland reads honestly, not as if
     it were in the town).
     """
-    places = _places()
+    places = _places(theater_id)
     if not places:
         return None
     best, best_d = None, float("inf")
