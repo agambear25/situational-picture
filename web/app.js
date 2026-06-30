@@ -68,20 +68,24 @@ const STATIC_MODE = location.hostname.endsWith("github.io") || location.protocol
 function _staticFile(path) {
   const [p, qs] = path.split("?");
   const q = new URLSearchParams(qs || "");
+  // Global (not theater-scoped): single files + by-id detail (ids are globally unique).
   if (p === "/healthz") return "data/healthz.json";
-  if (p === "/insights") return "data/insights.json";
-  if (p === "/control") return "data/control.json";
-  if (p === "/aois") return "data/aois.json";
-  if (p === "/verify-queue") return "data/verify-queue.json";
-  if (p === "/rejections") return "data/rejections.json";
-  if (p === "/rollup") { const l = q.get("level") || "1", par = q.get("parent");
-    return par ? `data/rollup/l${l}-${par}.json` : `data/rollup/l${l}.json`; }
-  if (p === "/features") return `data/features/${q.get("kind")}.json`;
-  if (p === "/events") { const aoi = q.get("aoi");
-    return aoi ? `data/events/aoi-${aoi}.json` : "data/events.json"; }
+  if (p === "/theaters") return "data/theaters.json";
   if (p.startsWith("/events/")) return `data/event/${p.split("/")[2]}.json`;
   if (p.startsWith("/aois/")) return `data/aoi/${p.split("/")[2]}.json`;
   if (p.startsWith("/cells/")) return `data/cell/${encodeURIComponent(p.split("/")[2])}.json`;
+  // Theater-scoped views live under data/<theater>/…
+  const b = `data/${q.get("theater_id") || THEATER || "ua_donbas"}`;
+  if (p === "/insights") return `${b}/insights.json`;
+  if (p === "/control") return `${b}/control.json`;
+  if (p === "/aois") return `${b}/aois.json`;
+  if (p === "/verify-queue") return `${b}/verify-queue.json`;
+  if (p === "/rejections") return `${b}/rejections.json`;
+  if (p === "/rollup") { const l = q.get("level") || "1", par = q.get("parent");
+    return par ? `${b}/rollup/l${l}-${par}.json` : `${b}/rollup/l${l}.json`; }
+  if (p === "/features") return `${b}/features/${q.get("kind")}.json`;
+  if (p === "/events") { const aoi = q.get("aoi");
+    return aoi ? `${b}/events/aoi-${aoi}.json` : `${b}/events.json`; }
   return null;
 }
 async function api(path, opts) {
