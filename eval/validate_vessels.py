@@ -55,14 +55,17 @@ def main():
     p.add_argument("--end", default="2024-05-13")
     p.add_argument("--scale", type=int, default=40)
     p.add_argument("--k", type=float, default=4.0)
+    p.add_argument("--theater", default="hormuz")
     p.add_argument("--project", default=os.environ.get("GEE_PROJECT"))
+    p.add_argument("--ingest", action="store_true",
+                   help="append the vessel detections to the log (real GridResolver)")
     args = p.parse_args()
 
     import ee
     ee.Initialize(project=args.project or None)
     print(f"Sentinel-1 over {tuple(args.bbox)} @ {args.scale} m, {args.start}..{args.end} …")
     tile = scene(ee, args.bbox, args.start, args.end, args.scale)
-    det = SarVesselDetector(k_sigma=args.k, theater_id="hormuz")
+    det = SarVesselDetector(k_sigma=args.k, theater_id=args.theater)
     ships = det.infer([tile])
     print("=" * 56)
     print(f"  Sentinel-1 scenes mosaicked : {tile.meta['n_scenes']}")
@@ -70,6 +73,16 @@ def main():
     for o in sorted(ships, key=lambda o: -o.meta["peak_db_over_thr"])[:8]:
         print(f"    {o.meta['peak_db_over_thr']:5.1f} dB  {o.meta['n_pixels']:>3} px  @ {o.geo.lat:.3f},{o.geo.lon:.3f}")
     print("=" * 56)
+
+    if args.ingest:
+        from ingest.imagery.run import detect_and_persist
+        from ingest.imagery.caches import PgDetectionCache
+        from ingest.pipeline import build_context
+        ctx = build_context(args.theater)
+        c = detect_and_persist(det, [tile], ctx.conn, ctx.resolver, ctx.embedder,
+                               PgDetectionCache(ctx.conn), bus=ctx.bus)
+        print(f"INGEST: {c['ingested']} vessel obs written ({c['exact_dup']} dups, "
+              f"{c['rejected']} rejected {c['by_reason'] or ''})")
 
 
 if __name__ == "__main__":

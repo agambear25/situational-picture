@@ -20,6 +20,19 @@ theaters:
     control_cadence_hours: 24
     active: true
 
+  black_sea:
+    label: "Black Sea — Crimea + naval theater"
+    # Covers: Crimea, Sevastopol (Black Sea Fleet base), the Kerch strait/bridge, the naval AO.
+    bbox: [32.0, 44.0, 37.0, 46.3]
+    admin_source: geoboundaries
+    admin_level: hromada                  # geoBoundaries UKR includes Crimea + Sevastopol
+    admin_url: "https://www.geoboundaries.org/api/current/gbOpen/UKR/ADM3/"
+    aoi_buffer_km: 30
+    data_start: "2022-02-24"
+    data_end: null
+    control_cadence_hours: 24
+    active: false                         # Phase 5 (maritime) — land events + SAR vessels
+
   delhi:
     label: "Delhi NCT + Yamuna floodplain"
     bbox: [76.8, 28.3, 77.5, 29.0]
