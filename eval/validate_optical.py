@@ -70,6 +70,8 @@ def main():
     p.add_argument("--after", nargs=2, default=["2022-08-15", "2022-09-25"])
     p.add_argument("--scale", type=int, default=100)
     p.add_argument("--theater", default="ua_donbas")
+    p.add_argument("--max-cloud", type=float, default=40.0,
+                   help="scene cloud %% ceiling; raise it for cloudy windows (SCL still masks per-pixel)")
     p.add_argument("--project", default=os.environ.get("GEE_PROJECT"))
     p.add_argument("--ingest", action="store_true",
                    help="append the detected optical observations to the log (real GridResolver)")
@@ -77,9 +79,9 @@ def main():
 
     import ee
     ee.Initialize(project=args.project or None)
-    print(f"Sentinel-2 composites over {tuple(args.bbox)} at {args.scale} m …")
-    before = composite(ee, args.bbox, args.before[0], args.before[1], args.scale, "S2_BEFORE")
-    after = composite(ee, args.bbox, args.after[0], args.after[1], args.scale, "S2_AFTER")
+    print(f"Sentinel-2 composites over {tuple(args.bbox)} at {args.scale} m (cloud<{args.max_cloud}%) …")
+    before = composite(ee, args.bbox, args.before[0], args.before[1], args.scale, "S2_BEFORE", args.max_cloud)
+    after = composite(ee, args.bbox, args.after[0], args.after[1], args.scale, "S2_AFTER", args.max_cloud)
     print(f"  scenes: before={before.meta['n_scenes']}, after={after.meta['n_scenes']}")
 
     detector = OpticalIndexDetector(theater_id=args.theater)
