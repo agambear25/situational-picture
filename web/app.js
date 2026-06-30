@@ -823,6 +823,8 @@ async function loadTheaters() {
 function switchTheater(tid) {
   THEATER = tid;
   UNTIL = null;
+  const sel = document.getElementById("theaterSel");
+  if (sel && sel.value !== tid) sel.value = tid;   // keep the dropdown in sync on programmatic switch
   const t = THEATERS.find((x) => x.theater_id === tid);
   if (t && t.bbox && map) {
     const [w, s, e, n] = t.bbox;
