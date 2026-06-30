@@ -33,11 +33,15 @@ def significance(event: dict, now: datetime, cfg, cell_type_counts: dict[str, in
     rec = recency(event["occurred_start"], now, cfg.recency_tau_days)
     rec_factor = cfg.recency_floor + (1.0 - cfg.recency_floor) * rec   # floor keeps history alive
     nov = novelty(event["event_type"], cell_type_counts)
-    score = sev * conf * rec_factor * nov
+    # Corroboration: confirmed (≥2 independent families) leads; single-source is scored down so a
+    # flood of unconfirmed reports can't bury the few multi-source incidents.
+    corrob = 1.0 if int(event.get("n_independent_families") or 0) >= 2 else cfg.corroboration_single_factor
+    score = sev * conf * rec_factor * nov * corrob
     return {
         "score": round(score, 4),
         "components": {"severity": round(sev, 3), "confidence": round(conf, 3),
-                       "recency": round(rec_factor, 3), "novelty": round(nov, 3)},
+                       "recency": round(rec_factor, 3), "novelty": round(nov, 3),
+                       "corroboration": round(corrob, 3)},
         "rationale": _rationale(event, sev, conf, rec, nov),   # raw rec drives the wording
     }
 

@@ -14,6 +14,7 @@ _CFG = Path(__file__).parent.parent / "config" / "assessment.yaml"
 class AssessmentConfig:
     recency_tau_days: float
     recency_floor: float
+    corroboration_single_factor: float
     _severity: dict
     recent_window_days: float
     baseline_window_days: float
@@ -32,6 +33,7 @@ def load_assessment_config() -> AssessmentConfig:
     return AssessmentConfig(
         recency_tau_days=float(sig["recency_tau_days"]),
         recency_floor=float(sig["recency_floor"]),
+        corroboration_single_factor=float(sig["corroboration_single_factor"]),
         _severity=sig["severity"],
         recent_window_days=float(anom["recent_window_days"]),
         baseline_window_days=float(anom["baseline_window_days"]),

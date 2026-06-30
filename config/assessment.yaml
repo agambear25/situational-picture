@@ -9,6 +9,11 @@ assessment:
     # Without it, the time-decay zeroes everything older than ~2 months and the feed is just the
     # newest low-value reports. 0.4 lets severity × confidence carry notable past events.
     recency_floor: 0.5
+    # Corroboration weight: a COP's "what to look at first" must lead with CONFIRMED incidents.
+    # Single-source (one independent family → Rumored) events are real but less actionable, so they
+    # are scored down. Without this, thousands of single-source UCDP strike reports — each maximally
+    # "novel" in its own cell-month — swamp the handful of multi-source confirmed incidents.
+    corroboration_single_factor: 0.5
     # Per-event-type severity weight [0,1]. Higher = inherently more important to surface.
     severity:
       missile_launch:        0.95
