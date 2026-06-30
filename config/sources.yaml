@@ -78,6 +78,15 @@ sources:
     url: "https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S1_GRD"
     notes: "Classical deterministic change detector (Phase 3e). The baseline the deep model must beat."
     phase: 3
+  sentinel1_sar_vessel:
+    family_id: copernicus_sar
+    label: "Sentinel-1 SAR vessel detection (bright-target / CFAR over water)"
+    modality: imagery
+    reliability_w: 0.8
+    license: "Copernicus Open Access (via Google Earth Engine, noncommercial)"
+    url: "https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S1_GRD"
+    notes: "Ships as bright outliers on dark sea (Phase 5b, maritime). Emits naval_transit detections."
+    phase: 5
   sentinel2_optical_index:
     family_id: copernicus_optical     # distinct family from SAR — independent corroboration
     label: "Sentinel-2 spectral-index change (NDWI flood / NBR burn, GEE)"
