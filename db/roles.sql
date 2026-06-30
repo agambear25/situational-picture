@@ -34,6 +34,9 @@ GRANT SELECT, INSERT, DELETE ON world.area_of_interest TO cop_api;
 GRANT SELECT, INSERT, DELETE ON world.aoi_cell TO cop_api;
 GRANT USAGE, SELECT ON SEQUENCE world.area_of_interest_aoi_id_seq TO cop_api;
 
+-- The synthesis Read cache is read-only to the API (written by the synth.run runner via DB_DSN).
+GRANT SELECT ON world.area_read TO cop_api;
+
 -- Explicitly deny WRITE access to the append-only log (defense in depth; SELECT above stands).
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON log.observation FROM cop_api;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON log.obs_rejection FROM cop_api;

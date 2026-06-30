@@ -548,8 +548,8 @@ def get_aoi(conn, aoi_id: int) -> dict | None:
 
 def create_aoi(conn, theater_id: str, kind: str, label: str, source: str, *,
                source_feature_id: int | None = None, geom_wkt: str | None = None,
-               cell_ids: list | None = None, note: str | None = None,
-               created_by: str | None = None) -> dict:
+               cell_ids: list | None = None, admin_id: str | None = None,
+               note: str | None = None, created_by: str | None = None) -> dict:
     """Create an AOI from a feature / drawn geometry / lassoed cells, resolving its cell-set ONCE.
     Returns {aoi_id, n_cells}; n_cells==0 means the geometry didn't intersect the grid (caller 422s)."""
     with conn.cursor() as cur:
@@ -568,6 +568,14 @@ def create_aoi(conn, theater_id: str, kind: str, label: str, source: str, *,
         aoi_id = cur.fetchone()[0]
         if cell_ids:
             cells = [c for c in cell_ids if c]
+        elif admin_id:                                    # watch a whole region → its cells
+            cur.execute(
+                """SELECT cell_id FROM geo.cell_context
+                   WHERE theater_id = %s
+                     AND %s IN (admin_l1_id, admin_l2_id, admin_l3_id)""",
+                (theater_id, admin_id),
+            )
+            cells = [x[0] for x in cur.fetchall()]
         elif wkt:
             cur.execute(
                 """SELECT cell_id FROM geo.grid_cell
@@ -590,6 +598,84 @@ def delete_aoi(conn, aoi_id: int) -> bool:
         deleted = cur.rowcount > 0
     conn.commit()
     return deleted
+
+
+# ----------------------------------------------------- synthesis: AOR watch + per-area Read (6a)
+
+def gather_area_context(conn, aoi_id: int) -> dict | None:
+    """The grounded inputs for one area's attention + Read: its events (with a place label), the
+    anomaly assessments scoped to its cells, and the distinct sensor families that saw it."""
+    from datetime import timezone
+    from api.places import nearest_place
+    with conn.cursor() as cur:
+        cur.execute("SELECT label, theater_id FROM world.area_of_interest WHERE aoi_id = %s", (aoi_id,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        label, theater = row
+        cur.execute(
+            """SELECT e.event_type, e.confidence_band, lower(e.occurred_at), e.n_independent_families,
+                      ST_X(gc.centroid), ST_Y(gc.centroid)
+               FROM world.event e
+               JOIN world.aoi_cell ac ON ac.cell_id = e.cell_id
+               JOIN geo.grid_cell gc ON gc.cell_id = e.cell_id
+               WHERE ac.aoi_id = %s AND e.theater_id = %s""",
+            (aoi_id, theater),
+        )
+        events = []
+        for r in cur.fetchall():
+            occ = r[2]
+            events.append({
+                "event_type": r[0], "confidence_band": r[1],
+                "occurred_start": (occ.replace(tzinfo=timezone.utc) if (occ and not occ.tzinfo) else occ),
+                "n_independent_families": r[3],
+                "place_label": (nearest_place(r[4], r[5], theater) or {}).get("label"),
+            })
+        cur.execute(
+            """SELECT subkind FROM world.assessment
+               WHERE theater_id = %s AND assessment_type = 'anomaly'
+                 AND cell_id IN (SELECT cell_id FROM world.aoi_cell WHERE aoi_id = %s)""",
+            (theater, aoi_id),
+        )
+        anomalies = [{"subkind": r[0]} for r in cur.fetchall()]
+        cur.execute(
+            """SELECT DISTINCT source_family_id FROM log.observation
+               WHERE theater_id = %s
+                 AND cell_id IN (SELECT cell_id FROM world.aoi_cell WHERE aoi_id = %s)""",
+            (theater, aoi_id),
+        )
+        families = [r[0] for r in cur.fetchall()]
+    return {"label": label, "theater_id": theater, "events": events,
+            "anomalies": anomalies, "families": families}
+
+
+def get_cached_read(conn, aoi_id: int) -> dict | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT summary, indicators, provenance, generated_by, input_hash
+               FROM world.area_read WHERE aoi_id = %s""", (aoi_id,))
+        r = cur.fetchone()
+    if not r:
+        return None
+    return {"summary": r[0], "indicators": r[1], "provenance": r[2] or [],
+            "generated_by": r[3], "input_hash": r[4]}
+
+
+def upsert_read(conn, aoi_id: int, read: dict, input_hash: str) -> None:
+    import json
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO world.area_read
+                 (aoi_id, summary, indicators, provenance, input_hash, generated_by, generated_at)
+               VALUES (%s, %s, %s, %s::jsonb, %s, %s, now())
+               ON CONFLICT (aoi_id) DO UPDATE SET
+                 summary=EXCLUDED.summary, indicators=EXCLUDED.indicators,
+                 provenance=EXCLUDED.provenance, input_hash=EXCLUDED.input_hash,
+                 generated_by=EXCLUDED.generated_by, generated_at=now()""",
+            (aoi_id, read["summary"], read["indicators"], json.dumps(read.get("provenance", [])),
+             input_hash, read.get("generated_by", "template")),
+        )
+    conn.commit()
 
 
 # --------------------------------------------------------------------------- assessments (Phase 4a)
