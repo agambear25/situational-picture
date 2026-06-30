@@ -21,6 +21,7 @@ def list_events(
     flag: Optional[str] = None, limit: int = 100, offset: int = 0,
     since: Optional[str] = None, until: Optional[str] = None,
     admin_id: Optional[str] = None, admin_level: Optional[int] = None,
+    aoi_id: Optional[int] = None,
 ) -> list[dict]:
     """Events for a theater, newest-first, with optional status/band/flag/time filters.
 
@@ -43,6 +44,9 @@ def list_events(
         col = _ADMIN_COL[admin_level]
         where.append(f"cell_id IN (SELECT cell_id FROM geo.cell_context WHERE {col} = %s)")
         params.append(admin_id)
+    if aoi_id is not None:
+        where.append("cell_id IN (SELECT cell_id FROM world.aoi_cell WHERE aoi_id = %s)")
+        params.append(aoi_id)
     params.extend([limit, offset])
     sql = f"""
         SELECT event_id, theater_id, event_type, cell_id, resolved_precision_m,
@@ -459,6 +463,133 @@ def admin_breadcrumb(conn, admin_id: str) -> list[dict]:
             (admin_id,),
         )
         return [{"admin_id": r[0], "name": r[1], "level": r[2]} for r in cur.fetchall()]
+
+
+# --------------------------------------------------- areas of interest (named geographic entities)
+
+def list_features(conn, theater_id: str, kind: str | None = None,
+                  bbox: list | None = None, limit: int = 3000) -> list[dict]:
+    """Tier-1 reference feature library (geo.geo_feature) as map layers; simplified geometry."""
+    import json as _json
+    where = ["theater_id = %s"]
+    params: list = [theater_id]
+    if kind:
+        where.append("layer = %s"); params.append(kind)
+    if bbox and len(bbox) == 4:
+        where.append("geom && ST_MakeEnvelope(%s, %s, %s, %s, 4326)"); params += list(bbox)
+    params.append(limit)
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""SELECT feature_id, layer, properties->>'name',
+                       ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.0008))
+                FROM geo.geo_feature WHERE {' AND '.join(where)} LIMIT %s""",
+            params,
+        )
+        return [{"feature_id": r[0], "kind": r[1], "name": r[2],
+                 "geometry": _json.loads(r[3]) if r[3] else None} for r in cur.fetchall()]
+
+
+def list_aois(conn, theater_id: str, kind: str | None = None) -> list[dict]:
+    """Tier-2 areas of interest with their cell count + how many events fall in them."""
+    where = ["a.theater_id = %s"]
+    params: list = [theater_id]
+    if kind:
+        where.append("a.kind = %s"); params.append(kind)
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT a.aoi_id, a.kind, a.label, a.source, a.note, lower(a.created_at::text),
+                   count(DISTINCT ac.cell_id), count(DISTINCT e.event_id),
+                   ST_X(ST_PointOnSurface(a.geom)), ST_Y(ST_PointOnSurface(a.geom))
+            FROM world.area_of_interest a
+            LEFT JOIN world.aoi_cell ac ON ac.aoi_id = a.aoi_id
+            LEFT JOIN world.event e ON e.cell_id = ac.cell_id AND e.theater_id = a.theater_id
+            WHERE {' AND '.join(where)}
+            GROUP BY a.aoi_id ORDER BY a.created_at DESC
+            """,
+            params,
+        )
+        out = []
+        for r in cur.fetchall():
+            out.append({"aoi_id": r[0], "kind": r[1], "label": r[2], "source": r[3], "note": r[4],
+                        "created_at": r[5], "n_cells": r[6], "n_events": r[7],
+                        "centroid": ({"type": "Point", "coordinates": [r[8], r[9]]}
+                                     if r[8] is not None else None)})
+        return out
+
+
+def get_aoi(conn, aoi_id: int) -> dict | None:
+    """One AOI: geometry, its cell-set, and an event-band summary (the rich brief is sub-project 2)."""
+    import json as _json
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT aoi_id, theater_id, kind, label, source, note,
+                      ST_AsGeoJSON(geom), ST_X(ST_PointOnSurface(geom)), ST_Y(ST_PointOnSurface(geom))
+               FROM world.area_of_interest WHERE aoi_id = %s""",
+            (aoi_id,),
+        )
+        r = cur.fetchone()
+        if not r:
+            return None
+        cur.execute("SELECT cell_id FROM world.aoi_cell WHERE aoi_id = %s", (aoi_id,))
+        cells = [x[0] for x in cur.fetchall()]
+        cur.execute(
+            """SELECT confidence_band, count(*) FROM world.event
+               WHERE theater_id = %s AND cell_id IN (SELECT cell_id FROM world.aoi_cell WHERE aoi_id = %s)
+               GROUP BY 1""",
+            (r[1], aoi_id),
+        )
+        bands = {x[0]: x[1] for x in cur.fetchall()}
+    return {"aoi_id": r[0], "theater_id": r[1], "kind": r[2], "label": r[3], "source": r[4],
+            "note": r[5], "geometry": _json.loads(r[6]) if r[6] else None,
+            "centroid": ({"type": "Point", "coordinates": [r[7], r[8]]} if r[7] is not None else None),
+            "cells": cells, "n_cells": len(cells), "bands": bands}
+
+
+def create_aoi(conn, theater_id: str, kind: str, label: str, source: str, *,
+               source_feature_id: int | None = None, geom_wkt: str | None = None,
+               cell_ids: list | None = None, note: str | None = None,
+               created_by: str | None = None) -> dict:
+    """Create an AOI from a feature / drawn geometry / lassoed cells, resolving its cell-set ONCE.
+    Returns {aoi_id, n_cells}; n_cells==0 means the geometry didn't intersect the grid (caller 422s)."""
+    with conn.cursor() as cur:
+        wkt = geom_wkt
+        if source_feature_id and not wkt:
+            cur.execute("SELECT ST_AsText(geom) FROM geo.geo_feature WHERE feature_id = %s",
+                        (source_feature_id,))
+            row = cur.fetchone()
+            wkt = row[0] if row else None
+        cur.execute(
+            """INSERT INTO world.area_of_interest
+                 (theater_id, kind, label, source, source_feature_id, geom, note, created_by)
+               VALUES (%s, %s, %s, %s, %s, ST_GeomFromText(%s, 4326), %s, %s) RETURNING aoi_id""",
+            (theater_id, kind, label, source, source_feature_id, wkt, note, created_by),
+        )
+        aoi_id = cur.fetchone()[0]
+        if cell_ids:
+            cells = [c for c in cell_ids if c]
+        elif wkt:
+            cur.execute(
+                """SELECT cell_id FROM geo.grid_cell
+                   WHERE theater_id = %s AND ST_Intersects(geom, ST_GeomFromText(%s, 4326))""",
+                (theater_id, wkt),
+            )
+            cells = [x[0] for x in cur.fetchall()]
+        else:
+            cells = []
+        for cid in cells:
+            cur.execute("INSERT INTO world.aoi_cell (aoi_id, cell_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                        (aoi_id, cid))
+    conn.commit()
+    return {"aoi_id": aoi_id, "n_cells": len(cells)}
+
+
+def delete_aoi(conn, aoi_id: int) -> bool:
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM world.area_of_interest WHERE aoi_id = %s", (aoi_id,))
+        deleted = cur.rowcount > 0
+    conn.commit()
+    return deleted
 
 
 # --------------------------------------------------------------------------- assessments (Phase 4a)

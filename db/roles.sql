@@ -28,6 +28,12 @@ GRANT SELECT ON log.obs_rejection TO cop_api;
 GRANT INSERT ON world.review_annotation TO cop_api;
 GRANT INSERT ON world.label_annotation TO cop_api;
 
+-- Areas of interest: analyst-created named entities/areas. INSERT + DELETE (the analyst can remove
+-- an AOI), plus the id sequence. Still no access to the evidence log or the read-model events.
+GRANT SELECT, INSERT, DELETE ON world.area_of_interest TO cop_api;
+GRANT SELECT, INSERT, DELETE ON world.aoi_cell TO cop_api;
+GRANT USAGE, SELECT ON SEQUENCE world.area_of_interest_aoi_id_seq TO cop_api;
+
 -- Explicitly deny WRITE access to the append-only log (defense in depth; SELECT above stands).
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON log.observation FROM cop_api;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON log.obs_rejection FROM cop_api;
