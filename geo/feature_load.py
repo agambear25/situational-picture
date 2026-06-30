@@ -65,7 +65,10 @@ def _rows_from_gdf(gdf, theater_id: str):
         if cls is None:
             continue
         rep = geom.representative_point()
-        yield cls[0], cls[1], (r.get("name") if "name" in cols else None), geom.wkt, rep.x, rep.y
+        name = r.get("name") if "name" in cols else None
+        if name is not None and name != name:   # pandas NaN (NaN != NaN) → no name
+            name = None
+        yield cls[0], cls[1], name, geom.wkt, rep.x, rep.y
 
 
 def load_features(theater_id: str, bbox, pbf_path: Path, conn) -> dict:
