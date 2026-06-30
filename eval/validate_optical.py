@@ -69,7 +69,10 @@ def main():
     p.add_argument("--before", nargs=2, default=["2022-05-01", "2022-06-01"])
     p.add_argument("--after", nargs=2, default=["2022-08-15", "2022-09-25"])
     p.add_argument("--scale", type=int, default=100)
+    p.add_argument("--theater", default="ua_donbas")
     p.add_argument("--project", default=os.environ.get("GEE_PROJECT"))
+    p.add_argument("--ingest", action="store_true",
+                   help="append the detected optical observations to the log (real GridResolver)")
     args = p.parse_args()
 
     import ee
@@ -79,7 +82,8 @@ def main():
     after = composite(ee, args.bbox, args.after[0], args.after[1], args.scale, "S2_AFTER")
     print(f"  scenes: before={before.meta['n_scenes']}, after={after.meta['n_scenes']}")
 
-    obs = OpticalIndexDetector().infer([before, after])
+    detector = OpticalIndexDetector(theater_id=args.theater)
+    obs = detector.infer([before, after])
     burns = sorted((o for o in obs if o.obs_type == "burn_scar"), key=lambda o: -o.meta["delta"])
     floods = sorted((o for o in obs if o.obs_type == "flood"), key=lambda o: -o.meta["delta"])
     print("=" * 60)
@@ -90,6 +94,21 @@ def main():
     for o in floods[:5]:
         print(f"    flood ΔMNDWI={o.meta['delta']:.2f}  {o.meta['n_pixels']}px @ {o.geo.lat:.3f},{o.geo.lon:.3f}")
     print("=" * 60)
+
+    if args.ingest:
+        # Reuse the proper imagery-ingest plumbing: cached_detect (coarsen via the REAL grid
+        # resolver) → append-only log. Same path as the SAR board ingest.
+        from ingest.imagery.run import detect_and_persist
+        from ingest.imagery.caches import PgDetectionCache
+        from ingest.pipeline import build_context
+        ctx = build_context(args.theater)
+        counters = detect_and_persist(detector, [before, after], ctx.conn, ctx.resolver,
+                                      ctx.embedder, PgDetectionCache(ctx.conn), bus=ctx.bus)
+        print(f"INGEST: {counters['ingested']} optical obs written to the log "
+              f"({counters['exact_dup']} dups, {counters['rejected']} rejected "
+              f"{counters['by_reason'] or ''})")
+        print("Next: python -m fusion.run --theater %s && python -m assess.run --theater %s"
+              % (args.theater, args.theater))
 
 
 if __name__ == "__main__":
