@@ -6,9 +6,13 @@ from datetime import datetime, timedelta, timezone
 from assess.config import load_assessment_config
 from assess.significance import significance, recency, novelty
 from assess.anomaly import cell_anomalies
+from assess.exposure import exposure, nearest_settlement
+from assess.gaps import collection_gap
 
 NOW = datetime(2024, 3, 10, 12, 0, tzinfo=timezone.utc)
 CFG = load_assessment_config()
+SETTLEMENTS = [{"name": "Mariupol", "lon": 37.60, "lat": 47.10},
+               {"name": "Bakhmut", "lon": 38.00, "lat": 48.60}]
 
 
 # --------------------------------------------------------------------------- significance
@@ -69,3 +73,42 @@ def test_no_escalation_for_milder_new_type():
     evs = [_ev("C4", "strike", NOW - timedelta(days=60)),
            _ev("C4", "fire", NOW - timedelta(days=1))]                     # new but milder
     assert not [a for a in cell_anomalies(evs, NOW, CFG) if a["subkind"] == "escalation"]
+
+
+# --------------------------------------------------------------------------- exposure (4c)
+
+def test_exposure_high_near_city():
+    x = exposure({"event_type": "strike", "lon": 37.61, "lat": 47.11}, SETTLEMENTS, CFG)
+    assert x and x["settlement"] == "Mariupol" and x["distance_km"] < 2 and x["score"] > 0.7
+    assert "Mariupol" in x["rationale"]
+
+
+def test_exposure_none_when_far():
+    assert exposure({"event_type": "strike", "lon": 40.0, "lat": 50.0}, SETTLEMENTS, CFG) is None
+
+
+def test_exposure_none_without_coords():
+    assert exposure({"event_type": "strike", "lon": None, "lat": None}, SETTLEMENTS, CFG) is None
+
+
+# --------------------------------------------------------------------------- collection-gap (4c)
+
+def test_gap_flags_recent_highsev_singlesource():
+    g = collection_gap({"event_type": "strike", "n_independent_families": 1,
+                        "occurred_start": NOW - timedelta(days=10)}, NOW, CFG)
+    assert g and "single source" in g["rationale"] and g["score"] > 0
+
+
+def test_gap_skips_corroborated():
+    assert collection_gap({"event_type": "strike", "n_independent_families": 2,
+                           "occurred_start": NOW}, NOW, CFG) is None
+
+
+def test_gap_skips_low_severity():
+    assert collection_gap({"event_type": "fire", "n_independent_families": 1,
+                           "occurred_start": NOW}, NOW, CFG) is None
+
+
+def test_gap_skips_old():
+    assert collection_gap({"event_type": "strike", "n_independent_families": 1,
+                           "occurred_start": NOW - timedelta(days=400)}, NOW, CFG) is None

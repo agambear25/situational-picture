@@ -503,6 +503,28 @@ def anomaly_assessments(conn, theater_id: str, limit: int = 20) -> list[dict]:
                  "components": r[4] or {}} for r in cur.fetchall()]
 
 
+def event_assessments(conn, theater_id: str, assessment_type: str, limit: int = 25) -> list[dict]:
+    """Event-linked assessments of a given kind (exposure / gaps), highest score first."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT a.event_id, a.score, a.rationale, a.components,
+                   e.event_type, e.confidence_band, e.cell_id, e.n_independent_families
+            FROM world.assessment a
+            JOIN world.event e ON e.event_id = a.event_id
+            WHERE a.theater_id = %s AND a.assessment_type = %s
+            ORDER BY a.score DESC, e.event_id
+            LIMIT %s
+            """,
+            (theater_id, assessment_type, limit),
+        )
+        return [{
+            "event_id": str(r[0]), "score": r[1], "rationale": r[2], "components": r[3] or {},
+            "event_type": r[4], "confidence_band": r[5], "cell_id": r[6],
+            "n_independent_families": r[7],
+        } for r in cur.fetchall()]
+
+
 def _iso(v):
     if v is None:
         return None

@@ -46,6 +46,19 @@ assessment:
       other:                 0.30
       _default:              0.50
 
+  # 4c — exposure: events in/near populated places (gazetteer settlement proximity is the $0 proxy
+  # until cell_context.builtup_pct is populated). Severity × proximity → who/what is at risk.
+  exposure:
+    radius_km: 15.0            # an event within this of a settlement is "exposed"; linear falloff
+    min_score: 0.12
+
+  # 4c — collection-gap: recent, high-stakes, SINGLE-source events worth pointing collection at.
+  # Not "every uncorroborated event" (there are thousands) — only severe + recent ones to chase.
+  gaps:
+    min_severity: 0.75        # high-stakes types only (strike/airstrike/damage/bridge/missile…)
+    recent_days: 120.0        # only recent gaps are actionable
+    min_score: 0.2
+
   # Per-cell anomaly detection over the chronology.
   anomaly:
     recent_window_days: 10.0        # what counts as "recent" activity

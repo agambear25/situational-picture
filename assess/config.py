@@ -21,6 +21,11 @@ class AssessmentConfig:
     spike_min_recent: int
     spike_ratio: float
     min_significance: float
+    exposure_radius_km: float
+    exposure_min_score: float
+    gaps_min_severity: float
+    gaps_recent_days: float
+    gaps_min_score: float
 
     def severity(self, event_type: str) -> float:
         return float(self._severity.get(event_type, self._severity.get("_default", 0.5)))
@@ -29,7 +34,7 @@ class AssessmentConfig:
 @lru_cache(maxsize=1)
 def load_assessment_config() -> AssessmentConfig:
     a = yaml.safe_load(_CFG.read_text(encoding="utf-8"))["assessment"]
-    sig, anom = a["significance"], a["anomaly"]
+    sig, anom, exp, gaps = a["significance"], a["anomaly"], a["exposure"], a["gaps"]
     return AssessmentConfig(
         recency_tau_days=float(sig["recency_tau_days"]),
         recency_floor=float(sig["recency_floor"]),
@@ -40,4 +45,9 @@ def load_assessment_config() -> AssessmentConfig:
         spike_min_recent=int(anom["spike_min_recent"]),
         spike_ratio=float(anom["spike_ratio"]),
         min_significance=float(anom["min_significance"]),
+        exposure_radius_km=float(exp["radius_km"]),
+        exposure_min_score=float(exp["min_score"]),
+        gaps_min_severity=float(gaps["min_severity"]),
+        gaps_recent_days=float(gaps["recent_days"]),
+        gaps_min_score=float(gaps["min_score"]),
     )

@@ -93,16 +93,18 @@ def insights(theater_id: str | None = Query(default=None), conn=Depends(get_conn
             return {"centroid": None, "place": None}
 
     significant = queries.top_significant(conn, theater_id, limit=25)
-    for item in significant:
-        item.update(_locate(item["cell_id"]))
     anomalies = queries.anomaly_assessments(conn, theater_id, limit=20)
-    for item in anomalies:
+    exposure = queries.event_assessments(conn, theater_id, "exposure", limit=25)
+    gaps = queries.event_assessments(conn, theater_id, "gaps", limit=25)
+    for item in (*significant, *anomalies, *exposure, *gaps):
         item.update(_locate(item["cell_id"]))
 
     return {
-        "available": bool(significant or anomalies),
+        "available": bool(significant or anomalies or exposure or gaps),
         "significant": significant,
         "anomalies": anomalies,
+        "exposure": exposure,
+        "gaps": gaps,
     }
 
 

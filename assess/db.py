@@ -13,9 +13,12 @@ def load_events(conn, theater_id: str) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT event_id, event_type, cell_id, confidence, confidence_band,
-                   lower(occurred_at), n_sources, n_independent_families, flags
-            FROM world.event WHERE theater_id = %s
+            SELECT e.event_id, e.event_type, e.cell_id, e.confidence, e.confidence_band,
+                   lower(e.occurred_at), e.n_sources, e.n_independent_families, e.flags,
+                   ST_X(gc.centroid), ST_Y(gc.centroid)
+            FROM world.event e
+            LEFT JOIN geo.grid_cell gc ON gc.cell_id = e.cell_id
+            WHERE e.theater_id = %s
             """,
             (theater_id,),
         )
@@ -28,6 +31,7 @@ def load_events(conn, theater_id: str) -> list[dict]:
             "confidence": r[3], "confidence_band": r[4],
             "occurred_start": ts if (ts is None or ts.tzinfo) else ts.replace(tzinfo=timezone.utc),
             "n_sources": r[6], "n_independent_families": r[7], "flags": list(r[8] or []),
+            "lon": r[9], "lat": r[10],
         })
     return out
 

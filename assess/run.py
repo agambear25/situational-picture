@@ -17,8 +17,22 @@ from datetime import datetime, timezone
 from assess.config import load_assessment_config
 from assess.significance import significance
 from assess.anomaly import cell_anomalies
+from assess.exposure import exposure
+from assess.gaps import collection_gap
 
 logger = logging.getLogger(__name__)
+
+# Exposure / gaps are priority lists, not exhaustive logs — keep the most actionable per kind.
+_TOP_N = 80
+
+
+def _load_settlements(theater_id: str) -> list[dict]:
+    import json
+    from pathlib import Path
+    p = Path(__file__).parent.parent / "config" / f"places_{theater_id}.json"
+    if not p.exists():
+        return []
+    return json.loads(p.read_text(encoding="utf-8")).get("places", [])
 
 
 def run(theater_id: str, now: datetime | None = None) -> dict:
@@ -52,9 +66,32 @@ def run(theater_id: str, now: datetime | None = None) -> dict:
                 "rationale": a["rationale"],
             })
 
+        # 4c — exposure (events near populated places) + collection-gap (recent single-source).
+        settlements = _load_settlements(theater_id)
+        exp = sorted(((e, exposure(e, settlements, cfg)) for e in events),
+                     key=lambda t: (t[1] or {}).get("score", 0), reverse=True)
+        exp = [(e, x) for e, x in exp if x][:_TOP_N]
+        for e, x in exp:
+            assessments.append({
+                "kind": "exposure", "subkind": None, "event_id": e["event_id"],
+                "cell_id": e["cell_id"], "score": x["score"],
+                "components": {"settlement": x["settlement"], "distance_km": x["distance_km"]},
+                "rationale": x["rationale"],
+            })
+
+        gaps = sorted(((e, collection_gap(e, now, cfg)) for e in events),
+                      key=lambda t: (t[1] or {}).get("score", 0), reverse=True)
+        gaps = [(e, g) for e, g in gaps if g][:_TOP_N]
+        for e, g in gaps:
+            assessments.append({
+                "kind": "gaps", "subkind": None, "event_id": e["event_id"],
+                "cell_id": e["cell_id"], "score": g["score"],
+                "components": {}, "rationale": g["rationale"],
+            })
+
         write_assessments(conn, theater_id, assessments, now)
-        return {"theater_id": theater_id, "events": len(events),
-                "significance": n_sig, "anomalies": len(anomalies)}
+        return {"theater_id": theater_id, "events": len(events), "significance": n_sig,
+                "anomalies": len(anomalies), "exposure": len(exp), "gaps": len(gaps)}
     finally:
         conn.close()
 
@@ -71,6 +108,8 @@ def main():
     print(f"  events scored      : {s['events']}")
     print(f"  significance rows  : {s['significance']}")
     print(f"  anomalies flagged  : {s['anomalies']}")
+    print(f"  exposure flags     : {s['exposure']}")
+    print(f"  collection gaps    : {s['gaps']}")
     print("=" * 56)
 
 
