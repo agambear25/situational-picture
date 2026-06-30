@@ -21,6 +21,7 @@ touch "$BUILD/.nojekyll"
 echo "[3/3] publish to gh-pages ..."
 ( cd "$BUILD"
   git init -q
+  git config http.postBuffer 524288000   # the snapshot is many small files → big pack; lift the 1MB cap
   git add -A
   git -c user.email=demo@local -c user.name=demo commit -qm "Static dashboard demo — board snapshot"
   git push -f "https://github.com/${REPO}.git" HEAD:gh-pages )
