@@ -78,12 +78,33 @@ keep-separate fallback); UCDP + FIRMS adapters; read-only FastAPI; coarsening bo
 | 5a | Control overlay | ✅ done |
 | 5b | Multi-theater + Hormuz SAR vessel | 🟩 substantially done (Black Sea live; vessel detector validated; Hormuz one run away) |
 | 5c | React/MapLibre UI + deploy decision | ⬜ not started (HTML UI is the interim; published static demo serves the deploy need) |
-| 6a | RAG "ask the COP" | 🟦 designed, next (scoped to a per-area synthesis Read, not a chatbot — see §4) |
-| 6b | Analyst-query UI | 🟦 folded into the redesign |
+| 6a | RAG "ask the COP" | ✅ SHIPPED as the per-area synthesis **Read** (local-LLM prose + deterministic fallback, cached in world.area_read) — not a chatbot, by design (see §4) |
+| 6b | Analyst-query UI | ✅ shipped as the AOR-first **"My watch"** home (attention-ranked areas + Read + provenance) |
 
 ---
 
-## 4. Next build (designed this session, about to start)
+## 4. Synthesis layer + AOR-first UI redesign — ✅ SHIPPED (2026-07-01)
+
+Built in three phases + published to the live demo:
+- **Phase 1 (pure core):** `assess/attention.py` (escalating/steady/quieting classifier),
+  `synth/context.py` (grounded, coord-free context), `synth/read.py` (deterministic + LLM Read).
+- **Phase 2 (API/DB):** `world.area_read` cache (migration 0013), `gather_area_context` /
+  `get_cached_read` / `upsert_read`, `GET /watch` (attention-ranked feed) + `GET /aois/{id}/read`,
+  region-watch via `admin_id`, `synth/run.py` runner.
+- **Phase 3 (UI):** **"My watch"** is the default tab — areas ranked by attention, each with its
+  Read snippet + "seen by" provenance; the area focus shows the **✦ Intelligence read** panel;
+  legend collapsed off the map.
+- **Phase 4 (publish):** local-LLM (qwen2.5:14b) Reads regenerated + cached; static export wired for
+  `/watch` + `/read`; multi-theater snapshot republished to gh-pages. Verified end-to-end in static
+  mode. **Bug fixed:** `OllamaClient.generate` hard-coded the Verdict JSON schema, so the Read came
+  back as adjudicator JSON — split into `generate()` (constrained) + `generate_text()` (free-form).
+- **Honest note:** both demo AOIs read **"quieting"** — real (activity peaked 2022–24, the recent
+  tail is sparse), not a bug. An actively-spiking area would read "escalating" and lead the feed.
+- **Not yet done:** the full map-first *visual* shell (slim icon rail / floating cards) — the AOR
+  *workflow* + synthesis ship now on the existing tab shell; the visual rebuild (5c, React/MapLibre)
+  remains the open polish item.
+
+### Original design decision (for reference)
 
 **Synthesis layer + AOR-first UI redesign.** Decided via brainstorm:
 - **Workflow = watch-list / AOR-first.** The home screen is **"My Watch"**: the areas you're
