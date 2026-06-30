@@ -1,5 +1,10 @@
 # Situational Picture
 
+### ▶ [**Open the live demo →**](https://agambear25.github.io/situational-picture/)
+*A real, clickable snapshot of the dashboard — runs entirely in your browser, no install.*
+
+---
+
 **An open-source intelligence (OSINT) tool that turns scattered public reports into one
 trustworthy map of a conflict — built to run entirely on a laptop, for free.**
 
@@ -44,8 +49,9 @@ The operator board has four main views — **What matters** (the ranked feed), *
 region drill-down), **Watch areas** (your marked areas of interest), and **Events** (the searchable
 timeline) — over a satellite basemap with a who-controlled-what overlay.
 
-*(Run it locally to see it live — `docs/` has the design write-ups; drop screenshots into
-`docs/screenshots/` to embed them here.)*
+**▶ [Try them live in the browser →](https://agambear25.github.io/situational-picture/)** — the
+demo is a static snapshot of real board data, so the map, the rankings, and the region drill-down
+all work with nothing to install.
 
 ## The interesting problems it solves
 

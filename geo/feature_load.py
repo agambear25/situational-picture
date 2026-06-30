@@ -43,7 +43,7 @@ def classify_feature(tags: dict) -> tuple[str, str] | None:
     if natural == "water":
         return ("water", "waterbody")
     if natural == "wood" or landuse == "forest":
-        return ("forest", landuse or natural)
+        return ("forest", "forest" if landuse == "forest" else "wood")
     if highway in ("motorway", "trunk", "primary"):
         return ("road", highway)
     if railway == "rail":
@@ -66,9 +66,14 @@ def _rows_from_gdf(gdf, theater_id: str):
             continue
         rep = geom.representative_point()
         name = r.get("name") if "name" in cols else None
-        if name is not None and name != name:   # pandas NaN (NaN != NaN) → no name
-            name = None
-        yield cls[0], cls[1], name, geom.wkt, rep.x, rep.y
+        yield cls[0], _clean(cls[1]), _clean(name), geom.wkt, rep.x, rep.y
+
+
+def _clean(v):
+    """pandas NaN / None → None, else a plain str (so json.dumps never emits the invalid token NaN)."""
+    if v is None or (isinstance(v, float) and v != v):
+        return None
+    return str(v)
 
 
 def load_features(theater_id: str, bbox, pbf_path: Path, conn) -> dict:

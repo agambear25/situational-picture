@@ -57,8 +57,37 @@ const CONFIDENCE = {
   "Unconfirmed — a single report": "Rumored",
 };
 
-/* ---- tiny API helper ---- */
+/* ---- tiny API helper (live API, or pre-exported JSON in the static GitHub Pages demo) ---- */
+// Static demo: no backend — GET calls read ./data/*.json snapshots, writes are no-ops.
+const STATIC_MODE = location.hostname.endsWith("github.io") || location.protocol === "file:" ||
+  location.search.includes("static") || window.STATIC_DEMO === true;
+function _staticFile(path) {
+  const [p, qs] = path.split("?");
+  const q = new URLSearchParams(qs || "");
+  if (p === "/healthz") return "data/healthz.json";
+  if (p === "/insights") return "data/insights.json";
+  if (p === "/control") return "data/control.json";
+  if (p === "/aois") return "data/aois.json";
+  if (p === "/verify-queue") return "data/verify-queue.json";
+  if (p === "/rejections") return "data/rejections.json";
+  if (p === "/rollup") { const l = q.get("level") || "1", par = q.get("parent");
+    return par ? `data/rollup/l${l}-${par}.json` : `data/rollup/l${l}.json`; }
+  if (p === "/features") return `data/features/${q.get("kind")}.json`;
+  if (p === "/events") { const aoi = q.get("aoi");
+    return aoi ? `data/events/aoi-${aoi}.json` : "data/events.json"; }
+  if (p.startsWith("/events/")) return `data/event/${p.split("/")[2]}.json`;
+  if (p.startsWith("/aois/")) return `data/aoi/${p.split("/")[2]}.json`;
+  if (p.startsWith("/cells/")) return `data/cell/${encodeURIComponent(p.split("/")[2])}.json`;
+  return null;
+}
 async function api(path, opts) {
+  if (STATIC_MODE) {
+    if (opts && opts.method && opts.method !== "GET") { toast("This is a read-only demo snapshot.", true); return null; }
+    const f = _staticFile(path);
+    if (!f) return null;
+    const r = await fetch(f);
+    return r.ok ? r.json() : null;
+  }
   const r = await fetch(API + path, opts);
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -773,9 +802,11 @@ async function boot() {
   const status = document.getElementById("status");
   try {
     const h = await api("/healthz");
-    THEATER = h.theater || THEATER;
+    THEATER = (h && h.theater) || THEATER;
     document.getElementById("theater").textContent = "Ukraine — " + THEATER;
-    status.textContent = "● connected"; status.className = "status ok";
+    status.textContent = STATIC_MODE ? "● live demo (snapshot)" : "● connected";
+    status.className = "status ok";
+    if (STATIC_MODE) toast("Live demo — a read-only snapshot of the board. Drawing & filters are disabled.");
   } catch (e) {
     status.textContent = "● backend offline"; status.className = "status off";
     toast("Can't reach the backend. Start it with: uvicorn api.main:app", true);
