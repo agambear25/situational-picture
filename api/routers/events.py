@@ -31,6 +31,8 @@ def list_events(
     flag: str | None = Query(default=None),
     since: str | None = Query(default=None),
     until: str | None = Query(default=None),
+    admin: str | None = Query(default=None),
+    admin_level: int | None = Query(default=None),
     limit: int = Query(default=200),
     offset: int = Query(default=0),
     conn=Depends(get_conn),
@@ -45,7 +47,8 @@ def list_events(
     theater_id = theater_id or settings["default_theater"]
     # Cap the page size so a caller cannot demand an unbounded scan.
     limit = min(limit, settings["max_page_size"])
-    rows = queries.list_events(conn, theater_id, status, band, flag, limit, offset, since, until)
+    rows = queries.list_events(conn, theater_id, status, band, flag, limit, offset, since, until,
+                               admin_id=admin, admin_level=admin_level)
     return {
         "events": [coarsen_event(e) for e in rows],
         "count": queries.event_count(conn, theater_id),

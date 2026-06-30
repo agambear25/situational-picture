@@ -599,3 +599,29 @@ button.btn.danger:hover { border-color: var(--danger); color: var(--danger); }
 .anom-badge.spike { background: var(--band-medium-soft); color: var(--band-medium); }
 .anom-badge.esc   { background: var(--band-high-soft);   color: var(--band-high); }
 .anom-place { font-weight: 600; font-size: 13px; color: var(--text); }
+
+/* ============================================================================
+   By area — region→district→community drill-down (rollup choropleth).
+   ============================================================================ */
+.breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 2px 0 10px; font-size: 12.5px; }
+.crumb { color: var(--accent); cursor: pointer; }
+.crumb:last-child { color: var(--text-2); cursor: default; font-weight: 600; }
+.crumb:hover:not(:last-child) { text-decoration: underline; }
+.crumb-sep { color: var(--faint); }
+.area-levelhdr { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+  margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
+.area-card { background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
+  padding: 10px 13px; margin: 7px 0; cursor: pointer; transition: background .14s, border-color .14s; }
+.area-card:hover { background: var(--panel-3); border-color: var(--line); }
+.area-card.dim { opacity: .5; cursor: default; }
+.area-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.area-name { font-weight: 600; font-size: 13.5px; color: var(--text); }
+.area-n { font: 600 13px/1 var(--mono); color: var(--text-2); white-space: nowrap; }
+.area-bar { height: 5px; border-radius: 3px; background: var(--panel-3); margin: 8px 0 6px; overflow: hidden; }
+.area-bar > span { display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--band-medium), var(--band-high)); }
+.area-meta { font-size: 11.5px; color: var(--muted); text-transform: capitalize; }
+.area-hi { color: var(--band-high); font-weight: 600; text-transform: none; }
+.area-label { color: #fff; font-size: 11px; font-weight: 600; text-shadow: 0 1px 3px #000, 0 0 2px #000;
+  white-space: nowrap; pointer-events: none; text-align: center; }
+.area-label b { display: block; font: 700 12px/1.1 var(--mono); color: #ffd9d5; }

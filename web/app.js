@@ -164,7 +164,7 @@ function focusEvent(ev) {
 }
 
 /* ---- tabs ---- */
-const TABS = { insights: renderInsights, events: renderEvents, review: renderReview, add: renderAdd, health: renderHealth };
+const TABS = { insights: renderInsights, areas: renderAreas, events: renderEvents, review: renderReview, add: renderAdd, health: renderHealth };
 function setTab(tab) {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   (TABS[tab] || renderEvents)();
@@ -250,6 +250,109 @@ function focusCell(lat, lon) {
   if (selectedLayer) { map.removeLayer(selectedLayer); selectedLayer = null; }
   selectedLayer = L.circleMarker([+lat, +lon], { radius: 15, color: "#fff", weight: 2, fill: false }).addTo(map);
   map.setView([+lat, +lon], Math.max(map.getZoom(), 11));
+}
+
+/* ---- By area (region → district → community drill-down) ---- */
+let AREA = { level: 1, parent: null };
+let AREA_UNITS = [];
+const AREA_LABEL = { 1: "Regions (oblasts)", 2: "Districts (raions)", 3: "Communities (hromadas)" };
+async function renderAreas() {
+  const panel = document.getElementById("panel");
+  panel.innerHTML = `<div class="empty">Loading…</div>`;
+  const q = `level=${AREA.level}` + (AREA.parent ? `&parent=${encodeURIComponent(AREA.parent)}` : "") +
+            (UNTIL ? `&until=${UNTIL}T23:59:59Z` : "");
+  let d;
+  try { d = await api(`/rollup?theater_id=${THEATER}&${q}`); }
+  catch (e) { panel.innerHTML = `<div class="empty">Couldn't load areas: ${esc(e.message)}</div>`; return; }
+  AREA_UNITS = (d && d.units) || [];
+  drawAreaChoropleth(AREA_UNITS);
+  const crumbs = [{ name: "All areas", level: 0, admin_id: "" }].concat(d.breadcrumb || []);
+  const crumbHTML = crumbs.map((c) =>
+    `<span class="crumb" data-lvl="${c.level}" data-id="${esc(c.admin_id || "")}">${esc(c.name)}</span>`)
+    .join('<span class="crumb-sep">›</span>');
+  const max = Math.max(1, ...AREA_UNITS.map((u) => u.n_events));
+  const active = AREA_UNITS.filter((u) => u.n_events > 0);
+  panel.innerHTML = `
+    <div class="hint">Activity rolled up by area — tap to drill in. ${UNTIL ? "As of " + esc(UNTIL) : "All dates"}.</div>
+    <div class="breadcrumb">${crumbHTML}</div>
+    <div class="area-levelhdr">${AREA_LABEL[AREA.level]} · ${active.length}/${AREA_UNITS.length} active · ${Number(d.total_events).toLocaleString()} events</div>
+    <div id="areaList">${AREA_UNITS.map((u) => areaCard(u, max)).join("")}</div>`;
+  panel.querySelectorAll(".area-card").forEach((c) => (c.onclick = () => drillArea(c.dataset.id)));
+  panel.querySelectorAll(".crumb").forEach((c) => (c.onclick = () => gotoCrumb(+c.dataset.lvl, c.dataset.id)));
+}
+function areaCard(u, max) {
+  const pct = Math.max(2, Math.round(100 * u.n_events / max));
+  const drillable = AREA.level < 3 && u.n_events > 0;
+  const hi = u.bands.High ? ` · <b class="area-hi">${u.bands.High} confirmed</b>` : "";
+  return `<div class="area-card${u.n_events ? "" : " dim"}" data-id="${esc(u.admin_id)}">
+    <div class="area-top">
+      <span class="area-name">${esc(u.name)}</span>
+      <span class="area-n">${Number(u.n_events).toLocaleString()}${drillable ? " ›" : ""}</span>
+    </div>
+    <div class="area-bar"><span style="width:${pct}%"></span></div>
+    <div class="area-meta">${u.top_type ? esc(String(u.top_type).replace(/_/g, " ")) : "no recorded activity"}${hi}</div>
+  </div>`;
+}
+function drillArea(id) {
+  const u = AREA_UNITS.find((x) => x.admin_id === id);
+  if (!u || u.n_events === 0) { if (u) focusArea(u); return; }
+  if (AREA.level >= 3) { renderAreaEvents(u); return; }   // leaf community → its actual events
+  AREA.level += 1; AREA.parent = id; renderAreas();
+}
+async function renderAreaEvents(unit) {
+  const panel = document.getElementById("panel");
+  panel.innerHTML = `<div class="empty">Loading…</div>`;
+  focusArea(unit);
+  const q = `admin=${encodeURIComponent(unit.admin_id)}&admin_level=3` + (UNTIL ? `&until=${UNTIL}T23:59:59Z` : "");
+  let data;
+  try { data = await api(`/events?theater_id=${THEATER}&limit=300&${q}`); }
+  catch (e) { panel.innerHTML = `<div class="empty">Couldn't load: ${esc(e.message)}</div>`; return; }
+  const events = (data && data.events) || [];
+  drawEvents(events);
+  const rank = { High: 0, Medium: 1, Low: 2, Rumored: 3 };
+  events.sort((a, b) => rank[bandOf(a)] - rank[bandOf(b)] ||
+    String(b.occurred_start || "").localeCompare(String(a.occurred_start || "")));
+  panel.innerHTML = `
+    <span class="backlink" id="backArea">‹ Back to areas</span>
+    <h2 style="margin:.3em 0 0">${esc(unit.name)}</h2>
+    <div class="hint">${events.length} event(s) in this community${UNTIL ? ", as of " + esc(UNTIL) : ""}. Tap one for its sources.</div>
+    ${events.map(cardHTML).join("") || '<div class="muted">No events.</div>'}`;
+  document.getElementById("backArea").onclick = renderAreas;
+  panel.querySelectorAll(".card").forEach((c) => (c.onclick = () => selectEvent(c.dataset.id)));
+}
+function gotoCrumb(crumbLevel, id) {
+  if (crumbLevel === 0) { AREA = { level: 1, parent: null }; }
+  else { AREA = { level: crumbLevel + 1, parent: id }; }
+  renderAreas();
+}
+function focusArea(u) {
+  if (u.centroid && u.centroid.coordinates) {
+    const [lon, lat] = u.centroid.coordinates;
+    map.setView([lat, lon], Math.max(map.getZoom(), AREA.level === 1 ? 8 : AREA.level === 2 ? 9 : 11));
+  }
+}
+function drawAreaChoropleth(units) {
+  eventLayer.clearLayers();
+  const max = Math.max(1, ...units.map((u) => u.n_events));
+  let bounds = null;
+  units.forEach((u) => {
+    if (!u.geometry) return;
+    const a = u.n_events / max;
+    const fill = u.n_events === 0 ? 0.03 : 0.12 + 0.6 * Math.sqrt(a);   // sqrt = perceptual heat scale
+    const lyr = L.geoJSON(u.geometry, { style: { color: "#ff7a6e", weight: 1, opacity: 0.45,
+      fillColor: "#ff5a52", fillOpacity: fill } }).on("click", () => drillArea(u.admin_id)).addTo(eventLayer);
+    bounds = bounds ? bounds.extend(lyr.getBounds()) : lyr.getBounds();
+    if (u.centroid && u.centroid.coordinates && u.n_events > 0) {
+      const [lon, lat] = u.centroid.coordinates;
+      L.marker([lat, lon], { interactive: false, icon: L.divIcon({ className: "area-label",
+        html: `${esc(u.name)}<b>${Number(u.n_events).toLocaleString()}</b>` }) }).addTo(eventLayer);
+    }
+  });
+  loadControl(UNTIL);
+  map.invalidateSize();   // container may have resized; without this fitBounds picks a bogus zoom
+  if (bounds && bounds.isValid())
+    map.fitBounds(bounds, { padding: [30, 30], maxZoom: AREA.level === 1 ? 8 : AREA.level === 2 ? 10 : 12 });
+  const chip = document.getElementById("mapChipN"); if (chip) chip.textContent = units.length;
 }
 
 /* ---- Events list ---- */

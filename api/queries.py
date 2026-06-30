@@ -20,6 +20,7 @@ def list_events(
     conn, theater_id: str, status: Optional[str] = None, band: Optional[str] = None,
     flag: Optional[str] = None, limit: int = 100, offset: int = 0,
     since: Optional[str] = None, until: Optional[str] = None,
+    admin_id: Optional[str] = None, admin_level: Optional[int] = None,
 ) -> list[dict]:
     """Events for a theater, newest-first, with optional status/band/flag/time filters.
 
@@ -38,6 +39,10 @@ def list_events(
         where.append("lower(occurred_at) >= %s"); params.append(since)
     if until:
         where.append("lower(occurred_at) <= %s"); params.append(until)
+    if admin_id and admin_level in (1, 2, 3):
+        col = _ADMIN_COL[admin_level]
+        where.append(f"cell_id IN (SELECT cell_id FROM geo.cell_context WHERE {col} = %s)")
+        params.append(admin_id)
     params.extend([limit, offset])
     sql = f"""
         SELECT event_id, theater_id, event_type, cell_id, resolved_precision_m,
@@ -384,6 +389,76 @@ def _uuid_array(v) -> list[str]:
         inner = v.strip().lstrip("{").rstrip("}").strip()
         return [x.strip().strip('"') for x in inner.split(",")] if inner else []
     return [str(x) for x in v]
+
+
+# --------------------------------------------------------------------------- admin rollup (drill-down)
+
+_ADMIN_COL = {1: "admin_l1_id", 2: "admin_l2_id", 3: "admin_l3_id"}
+
+
+def rollup(conn, theater_id: str, level: int, parent_id: str | None = None,
+           until: str | None = None) -> list[dict]:
+    """Event activity aggregated to admin units at `level` (1 oblast / 2 raion / 3 hromada),
+    optionally restricted to children of `parent_id` and to events on/before `until`. Units with
+    no events still appear (n=0) so the map shows the whole area. Geometry is simplified for the
+    choropleth; the time filter lives in the JOIN so empty-in-window units survive."""
+    col = _ADMIN_COL[level]
+    where = ["u.theater_id = %s", "u.level = %s"]
+    params: list = [theater_id, level]
+    if parent_id:
+        where.append("u.parent_id = %s")
+        params.append(parent_id)
+    time_clause = ""
+    if until:
+        time_clause = "AND lower(e.occurred_at) <= %s"
+        params.append(until)
+    sql = f"""
+        SELECT u.admin_id, u.name, u.level, u.parent_id,
+               ST_X(ST_PointOnSurface(u.geom)) AS lon, ST_Y(ST_PointOnSurface(u.geom)) AS lat,
+               ST_AsGeoJSON(ST_SimplifyPreserveTopology(u.geom, 0.005)) AS geojson,
+               count(e.event_id) AS n,
+               count(e.event_id) FILTER (WHERE e.confidence_band='High')    AS n_high,
+               count(e.event_id) FILTER (WHERE e.confidence_band='Medium')  AS n_medium,
+               count(e.event_id) FILTER (WHERE e.confidence_band='Low')     AS n_low,
+               count(e.event_id) FILTER (WHERE e.confidence_band='Rumored') AS n_rumored,
+               mode() WITHIN GROUP (ORDER BY e.event_type) AS top_type
+        FROM geo.admin_unit u
+        LEFT JOIN geo.cell_context cc ON cc.{col} = u.admin_id AND cc.theater_id = u.theater_id
+        LEFT JOIN world.event e ON e.cell_id = cc.cell_id AND e.theater_id = u.theater_id {time_clause}
+        WHERE {' AND '.join(where)}
+        GROUP BY u.admin_id, u.name, u.level, u.parent_id, u.geom
+        ORDER BY n DESC, u.name
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    import json as _json
+    return [{
+        "admin_id": r[0], "name": r[1], "level": r[2], "parent_id": r[3],
+        "centroid": {"type": "Point", "coordinates": [r[4], r[5]]},
+        "geometry": _json.loads(r[6]) if r[6] else None,
+        "n_events": r[7],
+        "bands": {"High": r[8], "Medium": r[9], "Low": r[10], "Rumored": r[11]},
+        "top_type": r[12],
+    } for r in rows]
+
+
+def admin_breadcrumb(conn, admin_id: str) -> list[dict]:
+    """The chain from the theater root down to `admin_id` (for the UI breadcrumb)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            WITH RECURSIVE chain AS (
+              SELECT admin_id, name, level, parent_id FROM geo.admin_unit WHERE admin_id = %s
+              UNION ALL
+              SELECT u.admin_id, u.name, u.level, u.parent_id
+              FROM geo.admin_unit u JOIN chain c ON u.admin_id = c.parent_id
+            )
+            SELECT admin_id, name, level FROM chain ORDER BY level
+            """,
+            (admin_id,),
+        )
+        return [{"admin_id": r[0], "name": r[1], "level": r[2]} for r in cur.fetchall()]
 
 
 # --------------------------------------------------------------------------- assessments (Phase 4a)
