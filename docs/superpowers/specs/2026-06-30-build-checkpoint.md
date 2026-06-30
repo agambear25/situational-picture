@@ -1,133 +1,112 @@
-# OSINT COP — Build Checkpoint vs PRD (2026-06-30)
+# OSINT COP — Build Checkpoint vs PRD (2026-06-30, refreshed)
 
-A snapshot of what is built, what remains, what the PRD (v1.1) calls for, and what I recommend
-next. Use it to decide sequencing. The companion UI-rebuild design lives in a separate spec.
+Where the build stands vs the PRD (v1.1) roadmap, after a long build session. Use it to see the
+roadmap at a glance and decide sequencing. The next build (synthesis layer + AOR-first UI redesign)
+is designed and about to start — see §4.
 
 ---
 
 ## 1. Where we are
 
-A Ukraine-first, local-only, $0, event-sourced OSINT Common Operating Picture is **running live**
-on the Mac. The deterministic spine (ingest → fusion → read model → API → UI) is complete and
-gated; the board now carries a **continuous 2022→2026 conflict chronology**, an **admin
-hierarchy with region→district→community drill-down**, an **assessment layer** (significance,
-anomaly, exposure, collection-gap), and **four independent sensor modalities** (text, thermal,
-SAR, optical).
+A Ukraine-first, local-only, $0, event-sourced OSINT Common Operating Picture, **running live** on
+the Mac, **published as a clickable demo**, and now **multi-theater** (land + maritime). The
+deterministic spine (ingest → fusion → read model → API → UI) is complete and gated; on top of it:
+a continuous 2022→2026 chronology, an admin drill-down, an assessment layer, **four sensor
+modalities**, **named areas of interest**, **SAR vessel detection**, and a **theater switcher**.
 
-- Gate: `python -m eval.harness` exits 0; **123 offline tests pass**; replay bit-identical.
-- Live board: **5,557 events across 53 months**; 7 source families
-  (ucdp 5,560 · unosat 255 · nasa_firms 202 · copernicus_sar 139 · copernicus_optical 70 ·
-  nasa_modis 27 · gdelt 3).
-- Standing constraints all hold: $0 / local / Claude-OFF; never ingest ISW/DeepStateMap geometry;
-  no person entities; 1km MGRS grid; coords coarsened at write.
+- Gate: `python -m eval.harness` exits 0; **135 offline tests pass**; replay bit-identical.
+- **Ukraine — Donbas board: ~11,900 events** (UCDP now at *daily* granularity), 7 source families
+  (ucdp · unosat · nasa_firms · copernicus_sar · copernicus_optical · nasa_modis · gdelt).
+- **Black Sea board: 103 events** (Crimea strikes + Sevastopol vessel transits).
+- **Public repo + live demo**: https://github.com/agambear25/situational-picture ·
+  https://agambear25.github.io/situational-picture/ (static snapshot, both theaters).
+- Standing constraints hold: $0 / local / Claude-OFF; never ISW/DeepStateMap; no person entities;
+  1km MGRS grid; coords coarsened at write.
 
 ---
 
 ## 2. What is BUILT
 
 **Phases 0–2 (spine) — complete.** Append-only Observation log; rebuildable CQRS read model;
-BLOCK→SCORE→ADJUDICATE→PROPAGATE fusion (pure, replayable); noisy-OR confidence over independent
-families; 3B→7B→14B local LLM gray-band adjudicator (Ollama, with keep-separate fallback); UCDP +
-FIRMS adapters; read-only FastAPI; coarsening boundary (no person, cell-only geometry).
+BLOCK→SCORE→ADJUDICATE→PROPAGATE fusion (pure, replayable; `block()` now spatial-grid, sub-O(N²));
+noisy-OR confidence over independent families; 3B→7B→14B local-LLM gray-band adjudicator (Ollama,
+keep-separate fallback); UCDP + FIRMS adapters; read-only FastAPI; coarsening boundary.
 
-**Phase 3 (imagery & CV) — through 3f.**
-- 3a live smoke + embedding pin · 3b GEE S1/S2 acquisition · 3c UNOSAT ground truth + eval ·
-  3d detector framework + determinism cache — **done**.
-- **3e classical SAR log-ratio detector — done + validated on real Sentinel-1** (Mariupol vs
-  UNOSAT, F1 ≈ 0.40 baseline).
-- **3f Sentinel-2 optical detector (MNDWI flood / dNBR burn) — done + validated on real S2**
-  (Sviati Hory + Kreminna 2022 forest burns → 25 burn_scar + 1 flood events on the board, the
-  independent `copernicus_optical` family). Cross-modal corroboration proven offline (optical +
-  text → High, bit-identical).
+**Phase 3 (imagery & CV) — 3a–3f done; 3i partial.**
+- 3a–3d done. **3e SAR log-ratio** + **3f S2 optical (MNDWI flood / dNBR burn)** — both validated on
+  real imagery; optical burns (Sviati Hory + Kreminna) on the board as `copernicus_optical`.
+- **3i partial** — per-event **sensor provenance** ("Seen by radar + thermal + news") now in the UI.
+- **3k partial** — admin substrate loaded; **OSM feature substrate** (geo_feature: water / roads /
+  forests / built-up) loaded; soil/utility/installation still NULL.
 
-**Phase 4 (assessments) — 4a + 4c.**
-- **4a significance + per-cell anomaly — done.** `/insights` ranks events by severity × confidence
-  × recency × novelty (corroboration-weighted so confirmed incidents lead); flags activity spikes
-  and escalations.
-- **4c exposure + collection-gap — done.** Exposure = severity × proximity-to-settlement;
-  collection-gap = recent, high-stakes, single-source events to chase a second source on.
+**Phase 4 (assessments) — 4a + 4c done.**
+- **4a** significance + per-cell anomaly (corroboration-weighted; `/insights`).
+- **4c** exposure (severity × settlement-proximity) + collection-gap (recent high-stakes
+  single-source). Both surface in `/insights`.
 
-**Phase 5 (breadth) — 5a (early).** Own-curated, license-clean **control overlay** (who held each
-area, over time), synced to the time scrubber.
+**Phase 5 (breadth) — 5a done; 5b substantially done.**
+- **5a** own-curated control overlay (who held what, over time), scrubber-synced.
+- **5b multi-theater + maritime** — **Black Sea theater** built (Crimea + Sevastopol + Kerch, 91k-
+  cell grid, admin, UCDP, vessels); **SAR vessel detector** built + validated (Hormuz 57, Sevastopol
+  254 on the fleet anchorage); **theater switcher** in the UI; Hormuz config ready (just run the
+  detector); Delhi config exists, not loaded.
 
-**Cross-cutting (beyond the strict roadmap).**
-- **Continuous chronology**: UCDP GED 2022–2026 aggregated to (cell, month), 53 continuous months.
-- **Admin substrate + drill-down**: geoBoundaries oblast→raion→hromada loaded (5/60/886 units),
-  every cell stamped; `/rollup` choropleth + breadcrumb "By area" tab.
-- **fusion.block() optimised** from O(N²) to a spatial-grid pre-filter (bit-identical) — unlocks
-  finer-grained ingest.
-- **HTML operator UI** served by the API (dark "intelligence-ops" board, place-name-forward,
-  plain-language confidence, satellite basemap, time scrubber, per-cell history).
+**Cross-cutting (beyond the strict roadmap), all this session:**
+- **Continuous chronology** — UCDP GED 2022–2026, daily granularity.
+- **Admin drill-down** — geoBoundaries oblast→raion→hromada; `/rollup` choropleth + breadcrumb.
+- **Named areas of interest** — `world.area_of_interest` + `aoi_cell`; `/aois` CRUD; the "Watch
+  areas" UI (draw / lasso / promote-a-feature → cell-set → events). *This is the AOR foundation.*
+- **Published recruiter demo** — jargon-free README; static multi-theater snapshot on GitHub Pages;
+  per-event provenance; per-theater gazetteers.
 
 ---
 
-## 3. What is LEFT (per PRD v1.1)
+## 3. Roadmap status (PRD v1.1)
 
-| Pass | PRD objective | Status |
+| Pass | Objective | Status |
 |---|---|---|
-| 3g | Deep-CV training harness (offline, free GPU → HF checkpoint) | not started |
-| 3h | Deep-CV inference adapter + determinism contract | not started |
-| 3i | **UI: imagery layer** — damage/change layer, corroboration + provenance shown | **not started** |
-| 3j | **UI: before/after + human-in-the-loop** confirm/reject → label_annotation | not started |
-| 3k | Extended substrate: soil / utility / installation → cell_context non-NULL | partial (admin done; rest NULL) |
-| 4b | Mobility + flood assessments (substrate-dependent) | not started |
-| 4d | **Entity population** (installation/site/vessel, cell-granular, confidence + staleness) | **schema exists, 0 rows** |
-| 5b | Delhi + Hormuz theaters (config swap); Hormuz SAR-vessel microservice | not started |
-| 5c | **React/MapLibre UI** + deployment decision | not started (HTML UI is the interim) |
-| 6a | **RAG "ask the COP"** — LangGraph + pgvector retrieval → grounded, cited answers | not started |
-| 6b | Analyst-query UI (chat panel with citations) | not started |
-
-`world.entity` (entity_id/theater_id/kind/label/cell_id/confidence/first_seen/last_seen/meta) and
-`geo.geo_feature` are in the schema but **empty** — the foundation for 4d and for named geographic
-entities is present but unpopulated.
-
----
-
-## 4. The new UI vision (this checkpoint's trigger)
-
-The user wants a far richer operator experience:
-
-1. **Entity drill-down** from regional/geographic level down to a particular entity or grid of
-   interest — extending the existing oblast→raion→hromada drill-down to a 4th "entity / cell"
-   level.
-2. **Named geographic entities** the user can create — e.g. a river bank acting as a
-   fortification / natural obstacle, a defensive line, a grid of interest — with strong focus.
-3. **Area-of-interest intelligence panel** — a journalist-style brief for a selected area:
-   plain-text **summary chronology** (what has happened), **latest signs**, a rough **forecast**
-   read (climate, war, troop movements, flare-ups), plus **context** — population and (where
-   available, rough) pre-war language demographics.
-4. **External commentary** — pull relevant snippets from social/long-form sources (Reddit,
-   YouTube, Substack) about the area or the wider theater.
-
-**How it maps to the PRD:** this is mostly **4d (entities)** + **3i (imagery/provenance in UI)** +
-**6a (RAG/narrative synthesis)** + a NEW external-context-ingestion capability the PRD only gestures
-at. It is genuinely a multi-subsystem effort and should be decomposed (see §5).
+| 0–2 | Event-sourcing spine + fusion + confidence | ✅ done |
+| 3a–3f | Imagery acquisition + classical SAR + optical detectors | ✅ done (validated) |
+| 3g / 3h | Deep-CV train / inference | ⬜ not started (side quest at $0; classical baseline holds) |
+| 3i | UI imagery layer + provenance | 🟧 partial (provenance done; dedicated change layer not) |
+| 3j | Before/after + human-in-the-loop | ⬜ not started |
+| 3k | Extended substrate (soil/utility/installation) | 🟧 partial (admin + OSM features done; rest NULL) |
+| 4a | Significance + anomaly | ✅ done |
+| 4b | Mobility + flood assessments | ⬜ not started (flood now cheap — optical detector + hydro) |
+| 4c | Exposure + collection-gap | ✅ done |
+| 4d | Entity population (installation/vessel/site) | 🟧 partial (vessels detected as events; `world.entity` empty; AOI model built) |
+| 5a | Control overlay | ✅ done |
+| 5b | Multi-theater + Hormuz SAR vessel | 🟩 substantially done (Black Sea live; vessel detector validated; Hormuz one run away) |
+| 5c | React/MapLibre UI + deploy decision | ⬜ not started (HTML UI is the interim; published static demo serves the deploy need) |
+| 6a | RAG "ask the COP" | 🟦 designed, next (scoped to a per-area synthesis Read, not a chatbot — see §4) |
+| 6b | Analyst-query UI | 🟦 folded into the redesign |
 
 ---
 
-## 5. Recommendation
+## 4. Next build (designed this session, about to start)
 
-The data foundation is solid; the highest-leverage work is now **presentation + synthesis**, which
-is exactly the user's UI vision. I recommend decomposing the vision into four sub-projects and
-building them in dependency order, each as its own spec → plan → implementation cycle:
+**Synthesis layer + AOR-first UI redesign.** Decided via brainstorm:
+- **Workflow = watch-list / AOR-first.** The home screen is **"My Watch"**: the areas you're
+  responsible for, ranked by an **attention signal** (escalating / steady / quieting, from the
+  anomaly + significance engine scoped per area), each with a one-line synthesis **Read**. Map
+  scoped to the AOR. **Explore** is where you find + "add to watch"; opening an area is the
+  investigate view. Watchable = **areas (AOIs) + whole regions** now; entities later.
+- **Synthesis layer** = a per-area **Read** (`/read?area=`): a grounded, local-LLM "recent activity
+  + indicators" read (honest: indicators from the data's anomaly/trend, not prophecy), with
+  provenance. Powers the My-Watch attention ranking + the focus view. This is PRD **6a** scoped to
+  area-narrative (not a freeform chatbot — that was deliberately left out).
+- **Shell** = map-first command center (full-bleed map hero, slim left rail, floating cards, corner
+  legend) — replacing the clunky 7-tab panel/map split.
+- Spec next: `docs/superpowers/specs/2026-06-30-synthesis-aor-redesign-design.md`.
 
-- **A. Entity & area model (foundation)** — extend `world.entity` for user-created *named
-  geographic* entities (river/obstacle/line/grid-of-interest, not just military), anchored to a set
-  of cells + optional geometry; an `/entities` + `/areas/{id}` API. Unblocks everything else. Maps
-  to PRD 4d. **Recommended first.**
-- **B. Entity drill-down + focus UI** — extend the "By area" drill-down to entities/grids; a strong
-  single-area focus view. Maps to 3i + the UI side of 4d.
-- **C. Area intelligence panel (synthesis)** — plain-text chronology summary + context
-  (population/demographics from free sources) + forecast read, generated locally (Ollama) and
-  grounded in the area's own events. Maps to 6a, read-only over the spine.
-- **D. External commentary research** — pull Reddit/YouTube/Substack snippets for an area. New
-  capability; needs a careful $0 / rate-limit / licensing approach. Lowest in the order (most
-  external risk).
+---
 
-**Lower priority but worth noting:** 4b flood assessment is now cheap (we have an optical flood
-detector + a hydro substrate hook); 3j before/after HITL pairs naturally with B; the React/MapLibre
-5c migration should wait until the HTML UI's feature set stabilises after this vision lands.
+## 5. After this — recommended order
 
-**Not recommended now:** 3g/3h deep CV (the classical detectors are an honest baseline and the
-$0/local constraint makes GPU training a side quest); 5b multi-theater (breadth before the depth
-this vision adds).
+1. **(in progress) Synthesis + AOR redesign** — the meaningful-workflow + sophistication leap.
+2. **4d entity population** — promote vessels + key features to `world.entity`; lets you *watch an
+   entity*, completing the AOR story.
+3. **4b flood assessment** — cheap now (optical flood detector + hydro substrate).
+4. **Hormuz theater** — config exists, detector proven; one acquisition + ingest run.
+5. **3j before/after HITL** — pairs with the investigate view.
+6. **3g/3h deep CV** / **5c React** — deferred; classical detectors + the HTML/static demo hold.
