@@ -8,7 +8,7 @@
 
 const API = "";                       // same origin (served by the API at /ui/)
 let THEATER = "ua_donbas";
-let map, eventLayer, selectedLayer, controlLayer;
+let map, eventLayer, selectedLayer, controlLayer, featureLayer, aoiLayer, drawHandler;
 const T_MIN = Date.UTC(2022, 1, 24);  // 2022-02-24, the full-scale invasion — chronology start
 let UNTIL = null;                      // null = live (everything); else "YYYY-MM-DD" cumulative cut-off
 // Coarse, own-curated control overlay (license-clean — authored from public knowledge, never ISW/DSM).
@@ -94,7 +94,10 @@ function initMap() {
   L.control.layers({ "Satellite": satellite, "Terrain": terrain, "Dark": dark }, null,
     { position: "topright", collapsed: true }).addTo(map);
   controlLayer = L.layerGroup().addTo(map);   // control tint sits UNDER the events
+  featureLayer = L.layerGroup().addTo(map);   // OSM reference geography (rivers/roads/forests)
   eventLayer = L.layerGroup().addTo(map);
+  aoiLayer = L.layerGroup().addTo(map);        // the selected / drawn area of interest (on top)
+  if (window.L && L.Draw) map.on(L.Draw.Event.CREATED, onAoiDrawn);
   renderLegend();
 }
 async function loadControl(date) {
@@ -164,7 +167,7 @@ function focusEvent(ev) {
 }
 
 /* ---- tabs ---- */
-const TABS = { insights: renderInsights, areas: renderAreas, events: renderEvents, review: renderReview, add: renderAdd, health: renderHealth };
+const TABS = { insights: renderInsights, areas: renderAreas, watch: renderWatchAreas, events: renderEvents, review: renderReview, add: renderAdd, health: renderHealth };
 function setTab(tab) {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   (TABS[tab] || renderEvents)();
@@ -621,6 +624,143 @@ async function renderHealth() {
     <div class="hint">Reports the system set aside (outside the area, or exact duplicates). Nothing is thrown away silently.</div>
     <div class="metric" style="margin-bottom:10px"><div class="v">${summary.total || 0}</div><div class="k">set aside (with a reason)</div></div>
     ${reasons ? `<table class="ctx">${reasons}</table>` : `<div class="muted">Nothing set aside.</div>`}`;
+}
+
+/* ---- Watch areas: feature layers + named areas of interest ---- */
+const FEATURE_KINDS = {
+  water:   { color: "#4aa3ff", label: "Rivers / water" },
+  road:    { color: "#d3a429", label: "Roads" },
+  forest:  { color: "#3fae6a", label: "Forests" },
+  builtup: { color: "#9b8cff", label: "Built-up" },
+};
+let FEATURE_ON = {};
+const _featGroups = {};
+
+async function renderWatchAreas() {
+  const panel = document.getElementById("panel");
+  panel.innerHTML = `
+    <div class="hint">Mark an area you care about — draw a box on the map and name it — and the system
+      pulls everything that's happened inside it. Toggle the geography layers to see rivers, roads and forests.</div>
+    <div class="section-title">Geography layers</div>
+    <div class="ftoggles">${Object.entries(FEATURE_KINDS).map(([k, d]) =>
+      `<label class="ftoggle"><input type="checkbox" data-fk="${k}"${FEATURE_ON[k] ? " checked" : ""}>
+        <span class="fdot" style="background:${d.color}"></span>${d.label}</label>`).join("")}</div>
+    <div class="section-title">Your areas <button class="btn small" id="drawAoi">+ Mark an area</button></div>
+    <div id="aoiList" class="empty">Loading…</div>`;
+  panel.querySelectorAll("[data-fk]").forEach((c) => (c.onchange = () => toggleFeature(c.dataset.fk, c.checked)));
+  document.getElementById("drawAoi").onclick = startDrawAoi;
+  for (const k of Object.keys(FEATURE_ON)) if (FEATURE_ON[k]) drawFeatures(k);
+  await loadAois();
+}
+
+async function loadAois() {
+  let d;
+  try { d = await api(`/aois?theater_id=${THEATER}`); }
+  catch (e) { document.getElementById("aoiList").innerHTML = `<div class="empty">Couldn't load: ${esc(e.message)}</div>`; return; }
+  const aois = (d && d.aois) || [];
+  aoiLayer.clearLayers();
+  aois.forEach((a) => {
+    if (!a.centroid) return;
+    const [lon, lat] = a.centroid.coordinates;
+    L.marker([lat, lon], { interactive: false, icon: L.divIcon({ className: "aoi-pin",
+      html: `${esc(a.label)}<b>${a.n_events}</b>` }) }).addTo(aoiLayer);
+  });
+  const list = document.getElementById("aoiList");
+  if (!aois.length) { list.className = "empty"; list.textContent = "No areas yet — draw one with “Mark an area”."; return; }
+  list.className = "";
+  list.innerHTML = aois.map(aoiCard).join("");
+  list.querySelectorAll(".aoi-card").forEach((c) => (c.onclick = () => focusAoi(+c.dataset.id)));
+}
+function aoiCard(a) {
+  return `<div class="aoi-card" data-id="${a.aoi_id}">
+    <div class="aoi-top"><span class="aoi-name">${esc(a.label)}</span><span class="aoi-n">${a.n_events} events ›</span></div>
+    <div class="aoi-meta">${esc(String(a.kind).replace(/_/g, " "))} · ${a.n_cells} cells${a.note ? " · " + esc(a.note) : ""}</div>
+  </div>`;
+}
+
+async function toggleFeature(kind, on) {
+  FEATURE_ON[kind] = on;
+  if (on) await drawFeatures(kind); else clearFeatures(kind);
+}
+async function drawFeatures(kind) {
+  let d;
+  try { d = await api(`/features?theater_id=${THEATER}&kind=${kind}`); } catch (e) { return; }
+  clearFeatures(kind);
+  const g = L.layerGroup(), color = FEATURE_KINDS[kind].color;
+  (d.features || []).forEach((f) => {
+    if (!f.geometry) return;
+    L.geoJSON(f.geometry, { style: { color, weight: kind === "water" ? 2 : 1.2, opacity: 0.7,
+      fillColor: color, fillOpacity: 0.1 } })
+      .bindTooltip(f.name || FEATURE_KINDS[kind].label, { sticky: true })
+      .on("click", () => promoteFeature(f, kind)).addTo(g);
+  });
+  g.addTo(featureLayer); _featGroups[kind] = g;
+}
+function clearFeatures(kind) {
+  if (_featGroups[kind]) { featureLayer.removeLayer(_featGroups[kind]); delete _featGroups[kind]; }
+}
+
+async function promoteFeature(f, kind) {
+  const name = prompt(`Name this ${FEATURE_KINDS[kind].label.toLowerCase()} as an area of interest:`, f.name || "");
+  if (!name) return;
+  const aoiKind = kind === "water" ? "obstacle" : kind === "road" ? "corridor" : "named_feature";
+  await createAoi({ kind: aoiKind, label: name, source: "derived", source_feature_id: f.feature_id });
+}
+function startDrawAoi() {
+  if (!window.L || !L.Draw) { toast("Drawing tool didn't load.", true); return; }
+  toast("Click on the map to draw a shape; double-click to finish.");
+  drawHandler = new L.Draw.Polygon(map, { shapeOptions: { color: "#ffd24a", weight: 2 } });
+  drawHandler.enable();
+}
+async function onAoiDrawn(e) {
+  const geometry = e.layer.toGeoJSON().geometry;
+  const name = prompt("Name this area of interest:");
+  if (!name) return;
+  await createAoi({ kind: "grid_of_interest", label: name, source: "drawn", geometry });
+}
+async function createAoi(body) {
+  body.theater_id = THEATER; body.created_by = analyst();
+  try {
+    const r = await api("/aois", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body) });
+    toast(`Marked “${body.label}” — ${r.n_cells} cells.`);
+    if (document.querySelector('.tabs button.active')?.dataset.tab === "watch") loadAois();
+  } catch (e) { toast("Couldn't create: " + e.message, true); }
+}
+
+async function focusAoi(id) {
+  const panel = document.getElementById("panel");
+  panel.innerHTML = `<div class="empty">Loading…</div>`;
+  let a;
+  try { a = await api(`/aois/${id}`); } catch (e) { panel.innerHTML = `<div class="empty">Couldn't load: ${esc(e.message)}</div>`; return; }
+  aoiLayer.clearLayers();
+  if (a.geometry) {
+    const lyr = L.geoJSON(a.geometry, { style: { color: "#ffd24a", weight: 2, fillColor: "#ffd24a", fillOpacity: 0.12 } }).addTo(aoiLayer);
+    try { map.invalidateSize(); map.fitBounds(lyr.getBounds(), { padding: [40, 40], maxZoom: 12 }); } catch (_) {}
+  }
+  let ev = [];
+  try { const d = await api(`/events?theater_id=${THEATER}&aoi=${id}&limit=300`); ev = (d && d.events) || []; } catch (_) {}
+  drawEvents(ev);
+  const rank = { High: 0, Medium: 1, Low: 2, Rumored: 3 };
+  ev.sort((x, y) => rank[bandOf(x)] - rank[bandOf(y)]);
+  const metrics = Object.entries(a.bands || {}).map(([b, n]) =>
+    `<div class="metric"><div class="v">${n}</div><div class="k">${BANDS[b] ? BANDS[b].plain : b}</div></div>`).join("");
+  panel.innerHTML = `
+    <span class="backlink" id="back">‹ Back to watch areas</span>
+    <h2 style="margin:.3em 0 0">${esc(a.label)}</h2>
+    <div class="muted" style="text-transform:capitalize">${esc(String(a.kind).replace(/_/g, " "))} · ${a.n_cells} cells</div>
+    ${a.note ? `<div class="hint">${esc(a.note)}</div>` : ""}
+    <div class="metrics">${metrics}</div>
+    <div class="section-title">Events here <button class="btn small danger" id="delAoi">Delete area</button></div>
+    <div class="hint">${ev.length} event(s) inside this area. Tap one for its sources.</div>
+    ${ev.map(cardHTML).join("") || '<div class="muted">No events recorded here yet.</div>'}`;
+  document.getElementById("back").onclick = () => { aoiLayer.clearLayers(); renderWatchAreas(); };
+  document.getElementById("delAoi").onclick = async () => {
+    if (!confirm(`Delete “${a.label}”?`)) return;
+    try { await api(`/aois/${id}`, { method: "DELETE" }); toast("Deleted."); aoiLayer.clearLayers(); renderWatchAreas(); }
+    catch (e) { toast("Couldn't delete: " + e.message, true); }
+  };
+  panel.querySelectorAll(".card").forEach((c) => (c.onclick = () => selectEvent(c.dataset.id)));
 }
 
 /* ---- boot ---- */
