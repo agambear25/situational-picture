@@ -37,6 +37,7 @@ def export_theater(out: Path, t: str, event_details: int, cells: set) -> int:
     b = f"data/{t}"
     n = 0
     for rel, path in [
+        (f"{b}/watch.json", f"/watch?theater_id={t}"),
         (f"{b}/insights.json", f"/insights?theater_id={t}"),
         (f"{b}/control.json", f"/control?theater_id={t}"),
         (f"{b}/aois.json", f"/aois?theater_id={t}"),
@@ -68,6 +69,7 @@ def export_theater(out: Path, t: str, event_details: int, cells: set) -> int:
     for a in get(f"/aois?theater_id={t}").get("aois", []):
         aid = a["aoi_id"]
         write(out, f"data/aoi/{aid}.json", get(f"/aois/{aid}")); n += 1
+        write(out, f"data/aoi/{aid}-read.json", get(f"/aois/{aid}/read")); n += 1
         write(out, f"{b}/events/aoi-{aid}.json", get(f"/events?theater_id={t}&aoi={aid}&limit=300")); n += 1
 
     for e in get(f"/events?theater_id={t}&limit={event_details}").get("events", []):

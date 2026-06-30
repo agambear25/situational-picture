@@ -72,10 +72,12 @@ function _staticFile(path) {
   if (p === "/healthz") return "data/healthz.json";
   if (p === "/theaters") return "data/theaters.json";
   if (p.startsWith("/events/")) return `data/event/${p.split("/")[2]}.json`;
+  if (p.startsWith("/aois/") && p.endsWith("/read")) return `data/aoi/${p.split("/")[2]}-read.json`;
   if (p.startsWith("/aois/")) return `data/aoi/${p.split("/")[2]}.json`;
   if (p.startsWith("/cells/")) return `data/cell/${encodeURIComponent(p.split("/")[2])}.json`;
   // Theater-scoped views live under data/<theater>/…
   const b = `data/${q.get("theater_id") || THEATER || "ua_donbas"}`;
+  if (p === "/watch") return `${b}/watch.json`;
   if (p === "/insights") return `${b}/insights.json`;
   if (p === "/control") return `${b}/control.json`;
   if (p === "/aois") return `${b}/aois.json`;

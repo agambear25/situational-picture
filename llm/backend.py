@@ -77,26 +77,31 @@ class OllamaClient:
         self._cb = breaker or CircuitBreaker(cfg.cb_failure_threshold, cfg.cb_recovery_timeout_s)
 
     def generate(self, model: str, prompt: str, timeout: float) -> str:
+        """Adjudicator path: constrained decoding to the Verdict JSON schema."""
+        return self._post(model, prompt, timeout, fmt=verdict_json_schema())
+
+    def generate_text(self, model: str, prompt: str, timeout: float) -> str:
+        """Free-form path (e.g. the synthesis Read prose): no schema constraint."""
+        return self._post(model, prompt, timeout, fmt=None)
+
+    def _post(self, model: str, prompt: str, timeout: float, *, fmt) -> str:
         if not self._cb.allow():
             raise LLMUnavailable("circuit open")
         import httpx  # lazy/heavy
-        schema = verdict_json_schema()
+        body = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": self._cfg.temperature,
+                "seed": self._cfg.seed,
+                "num_predict": self._cfg.max_tokens,
+            },
+        }
+        if fmt is not None:                       # constrained decoding only when a schema is given
+            body["format"] = fmt
         try:
-            resp = httpx.post(
-                f"{self._cfg.ollama_base_url}/api/generate",
-                json={
-                    "model": model,
-                    "prompt": prompt,
-                    "format": schema,
-                    "stream": False,
-                    "options": {
-                        "temperature": self._cfg.temperature,
-                        "seed": self._cfg.seed,
-                        "num_predict": self._cfg.max_tokens,
-                    },
-                },
-                timeout=timeout,
-            )
+            resp = httpx.post(f"{self._cfg.ollama_base_url}/api/generate", json=body, timeout=timeout)
             resp.raise_for_status()
             text = resp.json()["response"]
             self._cb.record_success()

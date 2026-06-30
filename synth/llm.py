@@ -13,7 +13,7 @@ def ollama_generate_fn(model: str | None = None):
         m, timeout = (model or cfg.adjudicator_model), cfg.adjudicator_timeout_s
 
         def gen(prompt: str) -> str:
-            return client.generate(m, prompt, timeout)
+            return client.generate_text(m, prompt, timeout)   # free-form prose, NOT verdict-JSON
 
         return gen
     except Exception:  # noqa: BLE001 — no local LLM configured → deterministic Read
