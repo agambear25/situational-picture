@@ -153,13 +153,15 @@ async function loadControl(date) {
 }
 function renderLegend() {
   document.getElementById("legend").innerHTML =
+    `<details><summary>Legend</summary>` +
     `<h4>How confident we are</h4>` +
     Object.entries(BANDS).map(([b, d]) =>
       `<div class="row"><span class="dot" style="background:${d.color}"></span><b>${d.plain}</b> — ${d.meaning}</div>`).join("") +
     `<h4 style="margin-top:10px">Who controlled the area</h4>` +
     Object.entries(CONTROL).map(([k, c]) =>
       `<div class="row"><span class="dot" style="background:${c.color};opacity:.65"></span>${c.label}</div>`).join("") +
-    `<div class="legend-caveat">Control is coarse &amp; illustrative — city-level, approximate dates, authored from public knowledge. Not a live frontline.</div>`;
+    `<div class="legend-caveat">Control is coarse &amp; illustrative — city-level, approximate dates, authored from public knowledge. Not a live frontline.</div>` +
+    `</details>`;
 }
 function drawEvents(events) {
   eventLayer.clearLayers();
@@ -684,42 +686,53 @@ const _featGroups = {};
 async function renderWatchAreas() {
   const panel = document.getElementById("panel");
   panel.innerHTML = `
-    <div class="hint">Mark an area you care about — draw a box on the map and name it — and the system
-      pulls everything that's happened inside it. Toggle the geography layers to see rivers, roads and forests.</div>
-    <div class="section-title">Geography layers</div>
+    <div class="hint">The areas you're watching, ranked by what needs attention. Each carries an
+      intelligence read of its recent activity. Draw a new one, or add a region from “By area”.</div>
+    <div class="section-title">Your areas <button class="btn small" id="drawAoi">+ Mark an area</button></div>
+    <div id="aoiList" class="empty">Loading…</div>
+    <details class="ftoggle-wrap"><summary>Geography layers</summary>
     <div class="ftoggles">${Object.entries(FEATURE_KINDS).map(([k, d]) =>
       `<label class="ftoggle"><input type="checkbox" data-fk="${k}"${FEATURE_ON[k] ? " checked" : ""}>
-        <span class="fdot" style="background:${d.color}"></span>${d.label}</label>`).join("")}</div>
-    <div class="section-title">Your areas <button class="btn small" id="drawAoi">+ Mark an area</button></div>
-    <div id="aoiList" class="empty">Loading…</div>`;
+        <span class="fdot" style="background:${d.color}"></span>${d.label}</label>`).join("")}</div></details>`;
   panel.querySelectorAll("[data-fk]").forEach((c) => (c.onchange = () => toggleFeature(c.dataset.fk, c.checked)));
   document.getElementById("drawAoi").onclick = startDrawAoi;
   for (const k of Object.keys(FEATURE_ON)) if (FEATURE_ON[k]) drawFeatures(k);
   await loadAois();
 }
 
+const ATT = {
+  escalating: { cls: "esc", label: "Escalating", arrow: "▲" },
+  steady: { cls: "steady", label: "Steady", arrow: "—" },
+  quieting: { cls: "quiet", label: "Quieting", arrow: "▼" },
+};
 async function loadAois() {
   let d;
-  try { d = await api(`/aois?theater_id=${THEATER}`); }
+  try { d = await api(`/watch?theater_id=${THEATER}`); }
   catch (e) { document.getElementById("aoiList").innerHTML = `<div class="empty">Couldn't load: ${esc(e.message)}</div>`; return; }
-  const aois = (d && d.aois) || [];
+  const areas = (d && d.areas) || [];
   aoiLayer.clearLayers();
-  aois.forEach((a) => {
+  areas.forEach((a) => {
     if (!a.centroid) return;
     const [lon, lat] = a.centroid.coordinates;
     L.marker([lat, lon], { interactive: false, icon: L.divIcon({ className: "aoi-pin",
       html: `${esc(a.label)}<b>${a.n_events}</b>` }) }).addTo(aoiLayer);
   });
   const list = document.getElementById("aoiList");
-  if (!aois.length) { list.className = "empty"; list.textContent = "No areas yet — draw one with “Mark an area”."; return; }
+  if (!areas.length) { list.className = "empty"; list.textContent = "No areas yet — draw one on the map with “Mark an area”."; return; }
   list.className = "";
-  list.innerHTML = aois.map(aoiCard).join("");
+  const need = d.needs_attention || 0;
+  const banner = need ? `<div class="watch-summary">▲ ${need} area${need > 1 ? "s" : ""} need attention</div>` : "";
+  list.innerHTML = banner + areas.map(aoiCard).join("");
   list.querySelectorAll(".aoi-card").forEach((c) => (c.onclick = () => focusAoi(+c.dataset.id)));
 }
 function aoiCard(a) {
-  return `<div class="aoi-card" data-id="${a.aoi_id}">
-    <div class="aoi-top"><span class="aoi-name">${esc(a.label)}</span><span class="aoi-n">${a.n_events} events ›</span></div>
-    <div class="aoi-meta">${esc(String(a.kind).replace(/_/g, " "))} · ${a.n_cells} cells${a.note ? " · " + esc(a.note) : ""}</div>
+  const att = ATT[(a.attention && a.attention.status) || "steady"] || ATT.steady;
+  const prov = (a.provenance || []).join(" · ");
+  return `<div class="aoi-card att-${att.cls}" data-id="${a.aoi_id}">
+    <div class="aoi-top"><span class="aoi-name">${esc(a.label)}</span>
+      <span class="att-badge ${att.cls}">${att.arrow} ${att.label}</span></div>
+    ${a.read ? `<div class="aoi-read">${esc(a.read)}</div>` : ""}
+    <div class="aoi-meta">${a.n_events} events · ${a.n_cells} cells${prov ? " · seen by " + esc(prov) : ""}</div>
   </div>`;
 }
 
@@ -783,18 +796,27 @@ async function focusAoi(id) {
     const lyr = L.geoJSON(a.geometry, { style: { color: "#ffd24a", weight: 2, fillColor: "#ffd24a", fillOpacity: 0.12 } }).addTo(aoiLayer);
     try { map.invalidateSize(); map.fitBounds(lyr.getBounds(), { padding: [40, 40], maxZoom: 12 }); } catch (_) {}
   }
-  let ev = [];
+  let ev = [], read = null;
   try { const d = await api(`/events?theater_id=${THEATER}&aoi=${id}&limit=300`); ev = (d && d.events) || []; } catch (_) {}
+  try { read = await api(`/aois/${id}/read`); } catch (_) {}
   drawEvents(ev);
   const rank = { High: 0, Medium: 1, Low: 2, Rumored: 3 };
   ev.sort((x, y) => rank[bandOf(x)] - rank[bandOf(y)]);
   const metrics = Object.entries(a.bands || {}).map(([b, n]) =>
     `<div class="metric"><div class="v">${n}</div><div class="k">${BANDS[b] ? BANDS[b].plain : b}</div></div>`).join("");
+  const att = read ? (ATT[read.indicators] || ATT.steady) : null;
+  const readHtml = read ? `<div class="read-panel">
+      <div class="read-head"><span class="read-title">✦ Intelligence read</span>
+        <span class="att-badge ${att.cls}">${att.arrow} ${att.label}</span></div>
+      <p class="read-body">${esc(read.summary)}</p>
+      ${(read.provenance || []).length ? `<div class="read-prov">Seen by ${esc((read.provenance || []).join(" · "))}</div>` : ""}
+    </div>` : "";
   panel.innerHTML = `
-    <span class="backlink" id="back">‹ Back to watch areas</span>
+    <span class="backlink" id="back">‹ Back to my watch</span>
     <h2 style="margin:.3em 0 0">${esc(a.label)}</h2>
     <div class="muted" style="text-transform:capitalize">${esc(String(a.kind).replace(/_/g, " "))} · ${a.n_cells} cells</div>
     ${a.note ? `<div class="hint">${esc(a.note)}</div>` : ""}
+    ${readHtml}
     <div class="metrics">${metrics}</div>
     <div class="section-title">Events here <button class="btn small danger" id="delAoi">Delete area</button></div>
     <div class="hint">${ev.length} event(s) inside this area. Tap one for its sources.</div>
@@ -855,6 +877,6 @@ async function boot() {
     status.textContent = "● backend offline"; status.className = "status off";
     toast("Can't reach the backend. Start it with: uvicorn api.main:app", true);
   }
-  setTab("insights");
+  setTab("watch");
 }
 boot();
