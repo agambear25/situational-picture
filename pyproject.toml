@@ -44,7 +44,7 @@ full = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["grid/tests", "geo/tests", "fusion/tests", "eval", "ingest/tests", "ingest/imagery/tests", "api/tests", "assess/tests"]
+testpaths = ["grid/tests", "geo/tests", "fusion/tests", "eval", "ingest/tests", "ingest/imagery/tests", "api/tests", "assess/tests", "synth/tests"]
 python_files = ["test_*.py"]
 
 [tool.setuptools.packages.find]
