@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Situational Picture — Ukraine</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- One accessible sentence describing the whole product. -->
+  <h1 class="sr-only">
+    Situational Picture: a public-OSINT situational-awareness board of conflict-related events
+    in Ukraine, with a map, a place-name-led incident feed, and a detail view. Decision support,
+    not a targeting tool.
+  </h1>
+
+  <!-- ============================ TOP BAR ============================ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>
+          <circle cx="12" cy="12" r="3.1" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+      <div class="brand-titles">
+        <span class="product">Situational Picture</span>
+        <select class="theater-sel" id="theaterSel" aria-label="Theater"><option>Loading…</option></select>
+      </div>
+    </div>
+
+    <!-- Live summary strip: counts by confidence. app.js fills the [data-count] spans. -->
+    <div class="summary" id="summary" role="group" aria-label="Summary by how confirmed events are">
+      <div class="stat total"><span class="n" data-count="total">—</span><span class="l">Events</span></div>
+      <div class="stat high"><span class="n" data-count="High">—</span><span class="l">Confirmed</span></div>
+      <div class="stat medium"><span class="n" data-count="Medium">—</span><span class="l">Partly</span></div>
+      <div class="stat low"><span class="n" data-count="Low">—</span><span class="l">Weak</span></div>
+      <div class="stat rumored"><span class="n" data-count="Rumored">—</span><span class="l">Rumored</span></div>
+    </div>
+
+    <div class="topright">
+      <span class="status" id="status" title="Backend status">connecting…</span>
+      <label class="you">You
+        <input id="analyst" type="text" placeholder="your name" />
+      </label>
+    </div>
+  </header>
+
+  <!-- ===================== PERSISTENT HONESTY BAR ===================== -->
+  <div class="honesty-bar" role="note">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+    </svg>
+    <p>
+      <strong>A situational-awareness tool — not a targeting tool.</strong>
+      Built from public reports (news, thermal/fire, satellite radar) that can be incomplete,
+      delayed, or wrong — don't act on a single dot. Locations are rounded to about
+      1&nbsp;km. Always confirm before acting.
+    </p>
+  </div>
+
+  <!-- ============================ MAIN ============================ -->
+  <main class="layout">
+    <!-- LEFT: tabs + the place-name-led list / detail panel (app.js owns #panel) -->
+    <aside class="sidebar">
+      <nav class="tabs" id="tabs" aria-label="Sections">
+        <button data-tab="watch" class="active">My watch</button>
+        <button data-tab="insights">What matters</button>
+        <button data-tab="areas">By area</button>
+        <button data-tab="events">Events</button>
+        <button data-tab="review">Needs review</button>
+        <button data-tab="add">Add event</button>
+        <button data-tab="health">Health</button>
+      </nav>
+      <div class="panel" id="panel"><!-- app.js renders the list and the detail view here --></div>
+    </aside>
+
+    <!-- RIGHT: the map is central -->
+    <section class="mapwrap">
+      <div id="map"></div>
+
+      <!-- Small count chip over the map. app.js may set #mapChipN; otherwise it's harmless. -->
+      <div class="map-chip" id="mapChip" aria-hidden="true">
+        <b id="mapChipN">0</b><span>on map · locations ~1&nbsp;km</span>
+      </div>
+
+      <!-- Plain-language confidence legend (filled by app.js renderLegend). -->
+      <div class="legend" id="legend"></div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

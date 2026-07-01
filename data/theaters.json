@@ -1,0 +1,1 @@
+{"theaters": [{"theater_id": "ua_donbas", "label": "Ukraine \u2014 Donbas + Zaporizhzhia", "bbox": [36.0, 46.8, 39.5, 49.5], "n_events": 11906}, {"theater_id": "black_sea", "label": "Black Sea \u2014 Crimea + naval theater", "bbox": [32.0, 44.0, 37.0, 46.3], "n_events": 110}]}
