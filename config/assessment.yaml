@@ -4,11 +4,13 @@
 assessment:
   # significance = severity × confidence × recency × novelty   (each in [0,1])
   significance:
-    recency_tau_days: 14.0          # recency = exp(-age_days / tau); recent events score higher
+    recency_tau_days: 10.0          # recency = exp(-age_days / tau); recent events score higher
     # Floor so a major HISTORICAL event still surfaces: recency_factor = floor + (1-floor)·decay.
     # Without it, the time-decay zeroes everything older than ~2 months and the feed is just the
-    # newest low-value reports. 0.4 lets severity × confidence carry notable past events.
-    recency_floor: 0.5
+    # newest low-value reports. Lowered 0.5→0.3 so recency BITES again — recent activity was being
+    # buried under year-old confirmed incidents that barely differed on this factor. The floor still
+    # keeps a notable past event on the board (severity × confidence carry it), just below fresh ones.
+    recency_floor: 0.3
     # Corroboration weight: a COP's "what to look at first" must lead with CONFIRMED incidents.
     # Single-source (one independent family → Rumored) events are real but less actionable, so they
     # are scored down. Without this, thousands of single-source UCDP strike reports — each maximally
@@ -65,4 +67,8 @@ assessment:
     baseline_window_days: 120.0     # the history we compare against
     spike_min_recent: 3             # >= this many recent events to consider a spike
     spike_ratio: 2.0                # recent rate must exceed baseline rate by this factor
-    min_significance: 0.15          # drop trivially-low significance assessments from /insights
+    # Noise floor for significance storage. assess.run keeps the top-N events by score ABOVE this
+    # floor (see _SIG_TOP_N) — top-N is robust to score-scale shifts (the recency rebalance dropped
+    # all scores; an absolute 0.15 gate then left only ~4 events). This just drops trivially-low
+    # scores before the top-N cut; the API still ranks + limits (top_significant 20, /area 50).
+    min_significance: 0.08          # drop trivially-low significance assessments, then take top-N

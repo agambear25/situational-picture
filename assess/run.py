@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Exposure / gaps are priority lists, not exhaustive logs — keep the most actionable per kind.
 _TOP_N = 80
+_SIG_TOP_N = 250     # significance is the primary feed → store a deeper top-N than exposure/gaps
 
 
 def _load_settlements(theater_id: str) -> list[dict]:
@@ -46,15 +47,19 @@ def run(theater_id: str, now: datetime | None = None) -> dict:
         events = load_events(conn, theater_id)
         counts = cell_type_counts(events)
 
+        # Significance: keep the top-N events by score (above a low noise floor) rather than an
+        # absolute cutoff. Top-N is robust to score-scale shifts (e.g. the recency rebalance) and
+        # gives every theater a proportional feed — a sparse theater still surfaces ITS most notable.
         assessments: list[dict] = []
-        for e in events:
-            s = significance(e, now, cfg, counts[e["cell_id"]])
-            if s["score"] >= cfg.min_significance:
-                assessments.append({
-                    "kind": "significance", "subkind": None, "event_id": e["event_id"],
-                    "cell_id": e["cell_id"], "score": s["score"],
-                    "components": s["components"], "rationale": s["rationale"],
-                })
+        sig_scored = [(e, significance(e, now, cfg, counts[e["cell_id"]])) for e in events]
+        sig_scored = [(e, s) for e, s in sig_scored if s["score"] >= cfg.min_significance]
+        sig_scored.sort(key=lambda t: t[1]["score"], reverse=True)
+        for e, s in sig_scored[:_SIG_TOP_N]:
+            assessments.append({
+                "kind": "significance", "subkind": None, "event_id": e["event_id"],
+                "cell_id": e["cell_id"], "score": s["score"],
+                "components": s["components"], "rationale": s["rationale"],
+            })
         n_sig = len(assessments)
 
         anomalies = cell_anomalies(events, now, cfg)
