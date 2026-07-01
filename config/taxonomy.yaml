@@ -121,15 +121,17 @@ type_compat:
 landcover_plausibility:
   # ESA WorldCover codes: 10=trees, 20=shrub, 30=grassland, 40=cropland,
   #                       50=built-up, 60=bare, 70=snow, 80=water, 90=wetland, 95=mangrove
+  # Vessels are plausible on water AND in port cells (WorldCover calls a 1km harbor cell 'built-up'),
+  # so penalize only CLEARLY-INLAND cover — cropland/trees/grassland/shrub — not merely "not-water".
   naval_transit:
-    required_codes: [80]           # must be water
-    penalty_if_not: 0.2
+    implausible_codes: [40, 10, 30, 20]
+    penalty_if_implausible: 0.2
   naval_engagement:
-    required_codes: [80]
-    penalty_if_not: 0.2
+    implausible_codes: [40, 10, 30, 20]
+    penalty_if_implausible: 0.2
   naval_mine:
-    required_codes: [80]
-    penalty_if_not: 0.2
+    implausible_codes: [40, 10, 30, 20]
+    penalty_if_implausible: 0.2
   troop_move:
     implausible_codes: [80]        # improbable in water cell
     penalty_if_implausible: 0.3
