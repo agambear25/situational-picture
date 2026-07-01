@@ -691,3 +691,20 @@ button.btn.danger:hover { border-color: var(--danger); color: var(--danger); }
 .legend > details > summary::-webkit-details-marker { display: none; }
 .legend > details > summary::before { content: "▸ "; }
 .legend > details[open] > summary::before { content: "▾ "; }
+
+/* ---- By-area place view (the spine): terrain chips, recent/significant rows, drill-in children ---- */
+.place-section { margin-top: 14px; }
+.place-section > h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #8b93a1); }
+.terrain-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.terrain-chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--chip-bg, #1c2230); border: 1px solid var(--border, #2a3140); color: var(--text, #d7dce4); }
+.place-ev { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+.place-ev:hover { background: var(--hover, #1b212d); }
+.place-ev .pe-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.place-ev .pe-score { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent, #ff5a52); min-width: 30px; }
+.place-ev .pe-type { font-weight: 600; text-transform: capitalize; }
+.place-ev .pe-place { color: var(--muted, #8b93a1); }
+.place-ev .pe-date { margin-left: auto; color: var(--muted, #8b93a1); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.place-kid { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; cursor: pointer; border: 1px solid var(--border, #2a3140); margin-bottom: 5px; }
+.place-kid:hover { background: var(--hover, #1b212d); border-color: var(--accent, #ff5a52); }
+.place-kid .pk-name { font-weight: 600; }
+.place-kid .pk-n { margin-left: auto; color: var(--muted, #8b93a1); font-variant-numeric: tabular-nums; white-space: nowrap; }

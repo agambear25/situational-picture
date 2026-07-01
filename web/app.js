@@ -339,9 +339,80 @@ function areaCard(u, max) {
 }
 function drillArea(id) {
   const u = AREA_UNITS.find((x) => x.admin_id === id);
-  if (!u || u.n_events === 0) { if (u) focusArea(u); return; }
-  if (AREA.level >= 3) { renderAreaEvents(u); return; }   // leaf community → its actual events
-  AREA.level += 1; AREA.parent = id; renderAreas();
+  if (u) focusArea(u);
+  openPlace(`admin:${id}`);   // any unit → its unified place view (Read + terrain + recent + drill-in)
+}
+
+// The place view: one area's Intelligence Read + terrain + recent activity + significant incidents +
+// attention-ranked child areas. The children ARE the drill-down (region → district → community).
+async function openPlace(ref) {
+  const panel = document.getElementById("panel");
+  panel.innerHTML = `<div class="empty">Loading…</div>`;
+  let p;
+  try { p = await api(`/area/${ref}`); }
+  catch (e) { panel.innerHTML = `<div class="empty">Couldn't load: ${esc(e.message)}</div>`; return; }
+  if (!p) { panel.innerHTML = `<div class="empty">Area not found.</div>`; return; }
+  drawEvents(p.recent || []);
+  panel.innerHTML = placePanelHTML(p);
+  document.getElementById("backArea").onclick = renderAreas;
+  panel.querySelectorAll(".place-kid").forEach((c) => (c.onclick = () => openPlace(c.dataset.ref)));
+  panel.querySelectorAll(".place-ev[data-id]").forEach((c) => (c.onclick = () => selectEvent(c.dataset.id)));
+}
+
+function placePanelHTML(p) {
+  const att = ATT[(p.attention && p.attention.status) || "steady"] || ATT.steady;
+  const t = p.terrain || {};
+  const chips = Object.entries(t.landcover || {}).slice(0, 3)
+    .map(([k, v]) => `<span class="terrain-chip">${esc(k)} ${Math.round(v * 100)}%</span>`);
+  if (t.builtup_pct > 0.02) chips.push(`<span class="terrain-chip">${Math.round(t.builtup_pct * 100)}% built-up</span>`);
+  if (t.road_unpaved_share > 0) chips.push(`<span class="terrain-chip">${Math.round(t.road_unpaved_share * 100)}% unpaved roads</span>`);
+  const read = p.read || {};
+  const readHtml = read.summary ? `<div class="read-panel">
+      <div class="read-head"><span class="read-title">✦ Intelligence read</span>
+        <span class="att-badge ${att.cls}">${att.arrow} ${att.label}</span></div>
+      <div class="read-body">${esc(read.summary)}</div>
+      ${(read.provenance || []).length ? `<div class="read-prov">Seen by ${esc((read.provenance || []).join(" · "))}</div>` : ""}
+    </div>` : "";
+  const recent = (p.recent || []).slice(0, 12).map(recentRow).join("") ||
+    `<div class="muted">No activity in the last 30 days.</div>`;
+  const sig = (p.significant || []).slice(0, 10).map(sigRow).join("") ||
+    `<div class="muted">Nothing flagged as significant here.</div>`;
+  const kids = (p.children || []).map(childRow).join("");
+  return `
+    <span class="backlink" id="backArea">‹ Back to areas</span>
+    <h2 style="margin:.3em 0 .2em">${esc(p.area.label)}</h2>
+    ${readHtml}
+    ${chips.length ? `<div class="place-section"><h4>Terrain</h4><div class="terrain-chips">${chips.join("")}</div></div>` : ""}
+    <div class="place-section"><h4>Recent activity <span class="muted">· last 30 days</span></h4>${recent}</div>
+    <div class="place-section"><h4>Significant incidents</h4>${sig}</div>
+    ${kids ? `<div class="place-section"><h4>Drill in</h4>${kids}</div>` : ""}`;
+}
+
+function recentRow(ev) {
+  const b = BANDS[bandOf(ev)] || {};
+  const date = String(ev.occurred_start || ev.occurred_at || "").slice(0, 10);
+  const geo = ev.geo_context ? ` · <span class="muted">${esc(ev.geo_context)}</span>` : "";
+  return `<div class="place-ev" data-id="${esc(ev.event_id)}">
+    <span class="pe-dot" style="background:${b.color || "#888"}"></span>
+    <span class="pe-type">${esc(String(ev.event_type).replace(/_/g, " "))}</span>
+    <span class="pe-place">${esc(placeLabel(ev))}</span>
+    <span class="pe-date">${esc(date)}</span>${geo}</div>`;
+}
+
+function sigRow(x) {
+  const date = String(x.occurred_start || "").slice(0, 10);
+  return `<div class="place-ev" data-id="${esc(x.event_id)}">
+    <span class="pe-score">${(x.score || 0).toFixed(2)}</span>
+    <span class="pe-type">${esc(String(x.event_type).replace(/_/g, " "))}</span>
+    <span class="pe-date">${esc(date)}</span></div>`;
+}
+
+function childRow(c) {
+  const att = ATT[(c.attention && c.attention.status) || "steady"] || ATT.steady;
+  return `<div class="place-kid" data-ref="${esc(c.ref)}">
+    <span class="pk-name">${esc(c.name)}</span>
+    <span class="att-badge ${att.cls}">${att.arrow} ${att.label}</span>
+    <span class="pk-n">${Number(c.n_events || 0).toLocaleString()} ›</span></div>`;
 }
 async function renderAreaEvents(unit) {
   const panel = document.getElementById("panel");
