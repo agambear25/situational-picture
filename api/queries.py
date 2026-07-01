@@ -703,6 +703,89 @@ def gather_area_context(conn, aoi_id: int) -> dict | None:
     return gather_area_context_ref(conn, f"aoi:{aoi_id}")
 
 
+def _significant_in_cells(conn, theater_id: str, cell_ids: list[str], limit: int = 50) -> list[dict]:
+    """The significance feed scoped to an area's cells (same shape as top_significant)."""
+    if not cell_ids:
+        return []
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT a.event_id, a.score, a.rationale, a.components,
+                      e.event_type, e.confidence_band, e.cell_id, e.n_independent_families,
+                      lower(e.occurred_at)
+               FROM world.assessment a JOIN world.event e ON e.event_id = a.event_id
+               WHERE a.theater_id = %s AND a.assessment_type = 'significance' AND e.cell_id = ANY(%s)
+               ORDER BY a.score DESC, e.event_id LIMIT %s""",
+            (theater_id, cell_ids, limit),
+        )
+        return [{
+            "event_id": str(r[0]), "score": r[1], "rationale": r[2], "components": r[3] or {},
+            "event_type": r[4], "confidence_band": r[5], "cell_id": r[6],
+            "n_independent_families": r[7], "occurred_start": _iso(r[8]),
+        } for r in cur.fetchall()]
+
+
+def _area_children(conn, area: dict, now) -> list[dict]:
+    """Immediate child admin units of an admin area, each with its attention, ranked so the areas
+    that need attention lead (the recency-forward drill-down). [] for an AOI or a level-3 unit."""
+    if area["kind"] != "admin" or (area["level"] or 3) >= 3:
+        return []
+    from datetime import timezone
+    from assess.attention import attention_sort_key, classify_attention
+    clevel = (area["level"] or 0) + 1
+    ccol, pcol = _ADMIN_COL[clevel], _ADMIN_COL[area["level"]]
+    units = rollup(conn, area["theater"], clevel, parent_id=area["id"])
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""SELECT cc.{ccol}, lower(e.occurred_at)
+                FROM world.event e JOIN geo.cell_context cc ON cc.cell_id = e.cell_id
+                WHERE e.theater_id = %s AND cc.{pcol} = %s AND cc.{ccol} IS NOT NULL""",
+            (area["theater"], area["id"]),
+        )
+        by_child: dict[str, list] = {}
+        for cid, occ in cur.fetchall():
+            occ = occ.replace(tzinfo=timezone.utc) if (occ and not occ.tzinfo) else occ
+            by_child.setdefault(cid, []).append({"occurred_start": occ})
+    out = []
+    for u in units:
+        att = classify_attention(by_child.get(u["admin_id"], []), [], now)
+        out.append({**u, "attention": att, "ref": f"admin:{u['admin_id']}"})
+    out.sort(key=lambda x: attention_sort_key(x["attention"], x.get("n_events", 0)))
+    return out
+
+
+def area_payload(conn, ref: str, recent_window_days: int = 30) -> dict | None:
+    """The unified place view for an area-ref: Read + attention + terrain + recent activity +
+    significant incidents + attention-ranked child areas."""
+    from datetime import datetime, timedelta, timezone
+    from assess.attention import classify_attention
+    from synth.context import build_context
+    from synth.read import deterministic_read
+    from api.coarsen import coarsen_event
+    area = _resolve_area(conn, ref)
+    if area is None:
+        return None
+    ctx = gather_area_context_ref(conn, ref)
+    theater = area["theater"]
+    now = datetime.now(timezone.utc)
+    att = classify_attention(ctx["events"], ctx["anomalies"], now)
+    read = deterministic_read(
+        build_context(ctx["label"], ctx["events"], ctx["anomalies"], ctx["families"], now), att)
+    cutoff = (now - timedelta(days=recent_window_days)).isoformat()
+    if area["kind"] == "admin":
+        raw = list_events(conn, theater, admin_id=area["id"], admin_level=area["level"],
+                          since=cutoff, limit=50)
+    else:
+        raw = list_events(conn, theater, aoi_id=area["id"], since=cutoff, limit=50)
+    recent = [coarsen_event({**e, "theater_id": theater}) for e in raw]
+    return {
+        "area": {k: area[k] for k in ("ref", "kind", "label", "theater", "level")},
+        "read": read, "attention": att, "terrain": ctx["terrain"],
+        "recent": recent,
+        "significant": _significant_in_cells(conn, theater, ctx["cell_ids"], limit=50),
+        "children": _area_children(conn, area, now),
+    }
+
+
 def get_cached_read(conn, aoi_id: int) -> dict | None:
     with conn.cursor() as cur:
         cur.execute(

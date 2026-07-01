@@ -132,6 +132,24 @@ def aoi_read(aoi_id: int, conn=Depends(get_conn)) -> dict:
     return read
 
 
+@router.get("/area/{ref}")
+def area(ref: str, conn=Depends(get_conn)) -> dict:
+    """Unified place view for an area-ref ('admin:<id>' or 'aoi:<id>'): Read + attention + terrain
+    + recent activity + significant incidents + attention-ranked child areas."""
+    p = queries.area_payload(conn, ref)
+    if p is None:
+        raise HTTPException(status_code=404, detail="area not found")
+    return p
+
+
+@router.get("/area/{ref}/read")
+def area_read(ref: str, conn=Depends(get_conn)) -> dict:
+    p = queries.area_payload(conn, ref)
+    if p is None:
+        raise HTTPException(status_code=404, detail="area not found")
+    return {**p["read"], "attention": p["attention"]}
+
+
 @router.get("/watch")
 def watch(theater_id: str | None = Query(default=None), conn=Depends(get_conn)) -> dict:
     """The AOR home feed: every area of interest with its attention status + Read snippet,
