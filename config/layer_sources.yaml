@@ -34,9 +34,12 @@ layers:
     label: "ESA WorldCover 10m land cover"
     source: esa_worldcover
     url_template: "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_{tile}_Map.tif"
-    # Tiles covering ua_donbas AOI: N45E034, N45E037, N48E034, N48E037
+    # WorldCover 3° tiles are named by SW corner at multiples of 3 (…033, 036, 039; …45, 48).
     tiles:
-      ua_donbas: ["N45E034", "N45E037", "N48E034", "N48E037"]
+      # ua_donbas AOI 36-39.5E/46.8-49.5N → E036+E039 cols × N45+N48 rows.
+      ua_donbas: ["N45E036", "N45E039", "N48E036", "N48E039"]
+      # black_sea AOI 32-37E/44-46.3N → E033+E036 cols × N42+N45 rows.
+      black_sea: ["N42E033", "N42E036", "N45E033", "N45E036"]
     format: geotiff
     resolution_m: 10
     license: CC-BY-4.0
