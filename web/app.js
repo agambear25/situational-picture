@@ -77,6 +77,11 @@ function _staticFile(path) {
   if (p.startsWith("/cells/")) return `data/cell/${encodeURIComponent(p.split("/")[2])}.json`;
   // Theater-scoped views live under data/<theater>/…
   const b = `data/${q.get("theater_id") || THEATER || "ua_donbas"}`;
+  if (p.startsWith("/area/")) {           // /area/admin:<id> | /area/aoi:<id>  (colon → '-' in files)
+    let ref = p.slice(6);
+    if (ref.endsWith("/read")) return `${b}/area/${ref.slice(0, -5).replace(":", "-")}-read.json`;
+    return `${b}/area/${ref.replace(":", "-")}.json`;
+  }
   if (p === "/watch") return `${b}/watch.json`;
   if (p === "/insights") return `${b}/insights.json`;
   if (p === "/control") return `${b}/control.json`;

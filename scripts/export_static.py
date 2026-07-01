@@ -50,15 +50,25 @@ def export_theater(out: Path, t: str, event_details: int, cells: set) -> int:
         except Exception as e:  # noqa: BLE001
             print(f"  skip {rel}: {e}")
 
+    def area_snap(aid: str) -> None:                       # /area/admin:<id> for the place view
+        nonlocal n
+        write(out, f"{b}/area/admin-{aid}.json", get(f"/area/admin:{aid}")); n += 1
+
     l1 = get(f"/rollup?level=1&theater_id={t}")
     write(out, f"{b}/rollup/l1.json", l1); n += 1
     for ob in l1.get("units", []):
         l2 = get(f"/rollup?level=2&parent={ob['admin_id']}&theater_id={t}")
         write(out, f"{b}/rollup/l2-{ob['admin_id']}.json", l2); n += 1
+        if ob.get("n_events", 0) > 0:
+            area_snap(ob["admin_id"])
         for ra in l2.get("units", []):
             if ra.get("n_events", 0) > 0:
-                write(out, f"{b}/rollup/l3-{ra['admin_id']}.json",
-                      get(f"/rollup?level=3&parent={ra['admin_id']}&theater_id={t}")); n += 1
+                l3 = get(f"/rollup?level=3&parent={ra['admin_id']}&theater_id={t}")
+                write(out, f"{b}/rollup/l3-{ra['admin_id']}.json", l3); n += 1
+                area_snap(ra["admin_id"])
+                for hr in l3.get("units", []):
+                    if hr.get("n_events", 0) > 0:
+                        area_snap(hr["admin_id"])
 
     for kind in ("water", "road", "forest", "builtup"):
         try:
@@ -70,6 +80,7 @@ def export_theater(out: Path, t: str, event_details: int, cells: set) -> int:
         aid = a["aoi_id"]
         write(out, f"data/aoi/{aid}.json", get(f"/aois/{aid}")); n += 1
         write(out, f"data/aoi/{aid}-read.json", get(f"/aois/{aid}/read")); n += 1
+        write(out, f"{b}/area/aoi-{aid}.json", get(f"/area/aoi:{aid}")); n += 1
         write(out, f"{b}/events/aoi-{aid}.json", get(f"/events?theater_id={t}&aoi={aid}&limit=300")); n += 1
 
     for e in get(f"/events?theater_id={t}&limit={event_details}").get("events", []):
