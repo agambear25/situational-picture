@@ -45,20 +45,25 @@ def load_landcover(theater_id: str, conn, tiles: list[str]) -> int:
     with conn.cursor() as cur:
         for cell_id in cell_ids:
             poly = cell_id_to_polygon(cell_id)
-            dominant = _dominant_class(datasets, poly)
-            if dominant is None:
+            fractions = _class_fractions(datasets, poly)
+            if not fractions:
                 continue
+            total = sum(fractions.values())
+            dominant = max(fractions, key=fractions.get)
+            builtup_pct = fractions.get(50, 0) / total          # WorldCover class 50 = built-up
             label = LC_LABELS.get(dominant, str(dominant))
             cur.execute(
                 """
-                INSERT INTO geo.cell_context (cell_id, theater_id, dominant_landcover, landcover_label, updated_at)
-                VALUES (%s, %s, %s, %s, now())
+                INSERT INTO geo.cell_context
+                    (cell_id, theater_id, dominant_landcover, landcover_label, builtup_pct, updated_at)
+                VALUES (%s, %s, %s, %s, %s, now())
                 ON CONFLICT (cell_id) DO UPDATE SET
                     dominant_landcover = EXCLUDED.dominant_landcover,
                     landcover_label = EXCLUDED.landcover_label,
+                    builtup_pct = EXCLUDED.builtup_pct,
                     updated_at = now()
                 """,
-                (cell_id, theater_id, int(dominant), label),
+                (cell_id, theater_id, int(dominant), label, round(float(builtup_pct), 4)),
             )
             updated += 1
         conn.commit()
@@ -70,8 +75,8 @@ def load_landcover(theater_id: str, conn, tiles: list[str]) -> int:
     return updated
 
 
-def _dominant_class(datasets: list, poly) -> int | None:
-    """Return the most frequent raster class within the polygon."""
+def _class_fractions(datasets: list, poly) -> dict[int, int] | None:
+    """Return {WorldCover class → pixel count} within the polygon (first tile with data wins)."""
     for ds in datasets:
         try:
             out_image, _ = mask(ds, [mapping(poly)], crop=True, nodata=0)
@@ -80,7 +85,7 @@ def _dominant_class(datasets: list, poly) -> int | None:
             if len(valid) == 0:
                 continue
             values, counts = np.unique(valid, return_counts=True)
-            return int(values[np.argmax(counts)])
+            return {int(v): int(c) for v, c in zip(values, counts)}
         except Exception:
             continue
     return None
