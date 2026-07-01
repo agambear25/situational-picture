@@ -619,51 +619,88 @@ def delete_aoi(conn, aoi_id: int) -> bool:
 
 # ----------------------------------------------------- synthesis: AOR watch + per-area Read (6a)
 
-def gather_area_context(conn, aoi_id: int) -> dict | None:
+def _resolve_area(conn, ref: str) -> dict | None:
+    """Resolve an area-ref ('aoi:<id>' | 'admin:<id>') to its label, theater, and a SQL fragment
+    that selects the area's 1km cells. The one abstraction that lets AOIs and admin units share the
+    synthesis Read / attention / terrain engines."""
+    kind, _, rid = ref.partition(":")
+    with conn.cursor() as cur:
+        if kind == "aoi":
+            if not rid.isdigit():
+                return None
+            cur.execute("SELECT label, theater_id FROM world.area_of_interest WHERE aoi_id = %s", (int(rid),))
+            r = cur.fetchone()
+            if not r:
+                return None
+            return {"ref": ref, "kind": "aoi", "id": int(rid), "label": r[0], "theater": r[1],
+                    "level": None,
+                    "cell_sql": "SELECT cell_id FROM world.aoi_cell WHERE aoi_id = %s",
+                    "cell_params": (int(rid),)}
+        if kind == "admin":
+            cur.execute("SELECT name, theater_id, level FROM geo.admin_unit WHERE admin_id = %s", (rid,))
+            r = cur.fetchone()
+            if not r:
+                return None
+            return {"ref": ref, "kind": "admin", "id": rid, "label": r[0], "theater": r[1],
+                    "level": r[2],
+                    "cell_sql": ("SELECT cell_id FROM geo.cell_context "
+                                 "WHERE %s IN (admin_l1_id, admin_l2_id, admin_l3_id)"),
+                    "cell_params": (rid,)}
+    return None
+
+
+def gather_area_context_ref(conn, ref: str) -> dict | None:
     """The grounded inputs for one area's attention + Read: its events (with a place label), the
-    anomaly assessments scoped to its cells, and the distinct sensor families that saw it."""
+    anomaly assessments scoped to its cells, the distinct sensor families that saw it, and its
+    terrain profile. Works for any area-ref (AOI or admin unit)."""
     from datetime import timezone
     from api.places import nearest_place
+    from geo.terrain import terrain_profile
+    area = _resolve_area(conn, ref)
+    if area is None:
+        return None
+    theater = area["theater"]
     with conn.cursor() as cur:
-        cur.execute("SELECT label, theater_id FROM world.area_of_interest WHERE aoi_id = %s", (aoi_id,))
-        row = cur.fetchone()
-        if not row:
-            return None
-        label, theater = row
-        cur.execute(
-            """SELECT e.event_type, e.confidence_band, lower(e.occurred_at), e.n_independent_families,
-                      ST_X(gc.centroid), ST_Y(gc.centroid)
-               FROM world.event e
-               JOIN world.aoi_cell ac ON ac.cell_id = e.cell_id
-               JOIN geo.grid_cell gc ON gc.cell_id = e.cell_id
-               WHERE ac.aoi_id = %s AND e.theater_id = %s""",
-            (aoi_id, theater),
-        )
-        events = []
-        for r in cur.fetchall():
-            occ = r[2]
-            events.append({
-                "event_type": r[0], "confidence_band": r[1],
-                "occurred_start": (occ.replace(tzinfo=timezone.utc) if (occ and not occ.tzinfo) else occ),
-                "n_independent_families": r[3],
-                "place_label": (nearest_place(r[4], r[5], theater) or {}).get("label"),
-            })
-        cur.execute(
-            """SELECT subkind FROM world.assessment
-               WHERE theater_id = %s AND assessment_type = 'anomaly'
-                 AND cell_id IN (SELECT cell_id FROM world.aoi_cell WHERE aoi_id = %s)""",
-            (theater, aoi_id),
-        )
-        anomalies = [{"subkind": r[0]} for r in cur.fetchall()]
-        cur.execute(
-            """SELECT DISTINCT source_family_id FROM log.observation
-               WHERE theater_id = %s
-                 AND cell_id IN (SELECT cell_id FROM world.aoi_cell WHERE aoi_id = %s)""",
-            (theater, aoi_id),
-        )
-        families = [r[0] for r in cur.fetchall()]
-    return {"label": label, "theater_id": theater, "events": events,
-            "anomalies": anomalies, "families": families}
+        cur.execute(area["cell_sql"], area["cell_params"])
+        cell_ids = [r[0] for r in cur.fetchall()]
+        events, anomalies, families = [], [], []
+        if cell_ids:
+            cur.execute(
+                """SELECT e.event_type, e.confidence_band, lower(e.occurred_at), e.n_independent_families,
+                          ST_X(gc.centroid), ST_Y(gc.centroid)
+                   FROM world.event e JOIN geo.grid_cell gc ON gc.cell_id = e.cell_id
+                   WHERE e.cell_id = ANY(%s) AND e.theater_id = %s""",
+                (cell_ids, theater),
+            )
+            for r in cur.fetchall():
+                occ = r[2]
+                events.append({
+                    "event_type": r[0], "confidence_band": r[1],
+                    "occurred_start": (occ.replace(tzinfo=timezone.utc) if (occ and not occ.tzinfo) else occ),
+                    "n_independent_families": r[3],
+                    "place_label": (nearest_place(r[4], r[5], theater) or {}).get("label"),
+                })
+            cur.execute(
+                """SELECT subkind FROM world.assessment
+                   WHERE theater_id = %s AND assessment_type = 'anomaly' AND cell_id = ANY(%s)""",
+                (theater, cell_ids),
+            )
+            anomalies = [{"subkind": r[0]} for r in cur.fetchall()]
+            cur.execute(
+                """SELECT DISTINCT source_family_id FROM log.observation
+                   WHERE theater_id = %s AND cell_id = ANY(%s)""",
+                (theater, cell_ids),
+            )
+            families = [r[0] for r in cur.fetchall()]
+    terrain = terrain_profile(conn, theater, cell_ids)
+    return {"label": area["label"], "theater_id": theater, "events": events,
+            "anomalies": anomalies, "families": families, "terrain": terrain, "cell_ids": cell_ids}
+
+
+def gather_area_context(conn, aoi_id: int) -> dict | None:
+    """Back-compat AOI entry point — the unified path keyed by an AOI ref. Existing callers
+    (synth.run, /watch, /aois/{id}/read) read events/anomalies/families/label, all still present."""
+    return gather_area_context_ref(conn, f"aoi:{aoi_id}")
 
 
 def get_cached_read(conn, aoi_id: int) -> dict | None:
