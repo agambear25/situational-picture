@@ -15,9 +15,11 @@ def load_events(conn, theater_id: str) -> list[dict]:
             """
             SELECT e.event_id, e.event_type, e.cell_id, e.confidence, e.confidence_band,
                    lower(e.occurred_at), e.n_sources, e.n_independent_families, e.flags,
-                   ST_X(gc.centroid), ST_Y(gc.centroid)
+                   ST_X(gc.centroid), ST_Y(gc.centroid),
+                   cc.builtup_pct, cc.landcover_label, cc.nearest_road_class, cc.road_surface
             FROM world.event e
             LEFT JOIN geo.grid_cell gc ON gc.cell_id = e.cell_id
+            LEFT JOIN geo.cell_context cc ON cc.cell_id = e.cell_id
             WHERE e.theater_id = %s
             """,
             (theater_id,),
@@ -32,6 +34,8 @@ def load_events(conn, theater_id: str) -> list[dict]:
             "occurred_start": ts if (ts is None or ts.tzinfo) else ts.replace(tzinfo=timezone.utc),
             "n_sources": r[6], "n_independent_families": r[7], "flags": list(r[8] or []),
             "lon": r[9], "lat": r[10],
+            "builtup_pct": r[11], "landcover_label": r[12],
+            "nearest_road_class": r[13], "road_surface": r[14],
         })
     return out
 

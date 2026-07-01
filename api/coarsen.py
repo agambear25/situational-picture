@@ -113,6 +113,10 @@ def coarsen_event(row: dict) -> dict:
     out["geometry"] = cell_geometry(cell_id, "cell_polygon")
     # Human-readable place name from the (already-coarse) centroid — "Avdiivka", not a cell code.
     out["place"] = _place_label(centroid, row.get("theater_id", "ua_donbas"))
+    # Cell-level geography context ("on cropland · along an unpaved track"), when the substrate has it.
+    from api.geo_phrase import geo_phrase
+    out["geo_context"] = geo_phrase(row.get("landcover_label"), row.get("nearest_road_class"),
+                                    row.get("road_surface"))
     return out
 
 

@@ -1,10 +1,11 @@
 """
 Exposure scoring (Phase 4c) — "who / what is at risk".
 
-An event's exposure ≈ severity × how close it is to a populated place. Proximity to a gazetteer
-settlement is the $0 proxy until cell_context.builtup_pct / population is populated; the major
-Donbas cities (the highest-value exposure targets) are exactly what the gazetteer holds. Pure +
-deterministic: settlements and the event centroid are injected, so it is unit-tested directly.
+An event's exposure ≈ severity × how exposed the cell is. Exposure = max(proximity-to-a-gazetteer-
+settlement, the cell's real WorldCover built-up fraction when populated). The settlement proxy still
+carries cells with no built-up data; a genuinely built-up cell now scores exposed regardless of its
+distance to a named settlement. Pure + deterministic: settlements, builtup_pct and the event centroid
+are injected, so it is unit-tested directly.
 """
 from __future__ import annotations
 
@@ -37,6 +38,9 @@ def exposure(event: dict, settlements: list[dict], cfg) -> dict | None:
     if name is None or km > cfg.exposure_radius_km:
         return None
     proximity = 1.0 - km / cfg.exposure_radius_km        # 1 at the settlement, 0 at the radius
+    builtup = event.get("builtup_pct")                   # real WorldCover built-up fraction, if populated
+    if builtup is not None:
+        proximity = max(proximity, float(builtup))       # a built-up cell IS exposed, distance aside
     sev = cfg.severity(event["event_type"])
     score = round(sev * proximity, 4)
     if score < cfg.exposure_min_score:

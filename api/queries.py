@@ -59,7 +59,24 @@ def list_events(
     """
     with conn.cursor() as cur:
         cur.execute(sql, params)
-        return [_event_row(r) for r in cur.fetchall()]
+        rows = [_event_row(r) for r in cur.fetchall()]
+    _attach_geo_context(conn, rows)
+    return rows
+
+
+def _attach_geo_context(conn, rows: list[dict]) -> None:
+    """Batch-fill each event row's cell land-cover/road fields (for the geo_context phrase). One query."""
+    cell_ids = list({r["cell_id"] for r in rows if r.get("cell_id")})
+    if not cell_ids:
+        return
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT cell_id, landcover_label, nearest_road_class, road_surface
+               FROM geo.cell_context WHERE cell_id = ANY(%s)""", (cell_ids,))
+        ctx = {r[0]: (r[1], r[2], r[3]) for r in cur.fetchall()}
+    for r in rows:
+        lc, rc, rs = ctx.get(r.get("cell_id"), (None, None, None))
+        r["landcover_label"], r["nearest_road_class"], r["road_surface"] = lc, rc, rs
 
 
 def event_count(conn, theater_id: str) -> int:
